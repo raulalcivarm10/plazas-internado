@@ -1,0 +1,12 @@
+# Proyecto propio y aislado: no comparte red, nombre ni puerto con connect-hub.
+name: plazas-internado
+
+services:
+  tablero:
+    build: .
+    image: plazas-internado:latest
+    container_name: plazas-internado-web
+    # 8093 elegido para no chocar con 80/443/4000 (connect-hub) ni 5817.
+    ports:
+      - "8093:80"
+    restart: unless-stopped

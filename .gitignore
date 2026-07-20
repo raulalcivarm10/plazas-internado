@@ -1,0 +1,21 @@
+node_modules/
+
+# ─────────────────────────────────────────────────────────────
+# DATOS PERSONALES — NUNCA AL REPOSITORIO
+# GitHub Pages gratuito exige repositorio publico. Si este JSON
+# se subiera, las cedulas y celulares quedarian expuestos y el
+# enmascarado de docs/index.html no serviria de nada.
+# El archivo vive solo en la maquina; en el repo queda el ejemplo.
+# ─────────────────────────────────────────────────────────────
+data/estudiantes.json
+
+# SQL de carga: lleva las 64 cedulas y celulares reales
+supabase/02-datos.sql
+
+# Build interno: datos completos
+dist/
+
+# Credenciales locales. La anon key de Supabase SI puede ser publica
+# (esta protegida por RLS), pero la contrasena de acceso NUNCA.
+.env
+*.local.json
