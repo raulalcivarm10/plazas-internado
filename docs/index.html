@@ -1,0 +1,2047 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Tablero de asignacion de plazas de internado rotativo.">
+<title>Selección de Plazas Hospitalarias — Internado</title>
+
+<style>
+/* ============================================================
+   TOKENS
+   Neutros con sesgo verde (mundo clínico), no gris puro.
+   ============================================================ */
+:root {
+  --paper:      #F1F4F2;
+  --surface:    #FFFFFF;
+  --surface-2:  #E8EDEA;
+  --line:       #D3DCD7;
+  --line-soft:  #E2E8E4;
+  --ink:        #16211E;
+  --ink-2:      #4A5C55;
+  --ink-3:      #7E8F88;
+
+  --heom:       #2E6E5E;   /* verde quirúrgico */
+  --hng:        #33578F;   /* azul naval */
+  --hagp:       #A85434;   /* terracota */
+
+  --ok:         #2E6E5E;
+  --alert:      #B4402C;
+  --focus:      #33578F;
+
+  --shadow-sm: 0 1px 2px rgba(22, 33, 30, .06);
+  --shadow-md: 0 6px 18px -8px rgba(22, 33, 30, .28);
+
+  --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --sans:  ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono:  ui-monospace, "Cascadia Mono", "SF Mono", "Consolas", "Liberation Mono", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper:      #0E1614;
+    --surface:    #16211E;
+    --surface-2:  #1E2C28;
+    --line:       #2B3B36;
+    --line-soft:  #223029;
+    --ink:        #E6EDEA;
+    --ink-2:      #A3B5AE;
+    --ink-3:      #71857D;
+
+    --heom:       #5FB39B;
+    --hng:        #7BA3DC;
+    --hagp:       #D6906B;
+
+    --ok:         #5FB39B;
+    --alert:      #E08871;
+    --focus:      #7BA3DC;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow-md: 0 8px 22px -10px rgba(0, 0, 0, .7);
+  }
+}
+
+/* El toggle del visor debe ganar en ambas direcciones */
+:root[data-theme="dark"] {
+  --paper:#0E1614; --surface:#16211E; --surface-2:#1E2C28;
+  --line:#2B3B36; --line-soft:#223029;
+  --ink:#E6EDEA; --ink-2:#A3B5AE; --ink-3:#71857D;
+  --heom:#5FB39B; --hng:#7BA3DC; --hagp:#D6906B;
+  --ok:#5FB39B; --alert:#E08871; --focus:#7BA3DC;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-md: 0 8px 22px -10px rgba(0,0,0,.7);
+}
+:root[data-theme="light"] {
+  --paper:#F1F4F2; --surface:#FFFFFF; --surface-2:#E8EDEA;
+  --line:#D3DCD7; --line-soft:#E2E8E4;
+  --ink:#16211E; --ink-2:#4A5C55; --ink-3:#7E8F88;
+  --heom:#2E6E5E; --hng:#33578F; --hagp:#A85434;
+  --ok:#2E6E5E; --alert:#B4402C; --focus:#33578F;
+  --shadow-sm: 0 1px 2px rgba(22,33,30,.06);
+  --shadow-md: 0 6px 18px -8px rgba(22,33,30,.28);
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+/* ============================================================
+   ENCABEZADO
+   ============================================================ */
+.board-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 20px 28px;
+  padding: 26px 28px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.title-block { flex: 1 1 320px; min-width: 0; }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 6px;
+}
+
+.board-head h1 {
+  font-family: var(--serif);
+  font-size: 27px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -.012em;
+  text-wrap: balance;
+  margin: 0;
+}
+
+.board-head .lede {
+  margin: 7px 0 0;
+  font-size: 13px;
+  color: var(--ink-2);
+  max-width: 62ch;
+}
+
+/* Resumen antes que el detalle */
+.summary {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.stat {
+  padding: 9px 18px;
+  min-width: 92px;
+  border-right: 1px solid var(--line);
+}
+.stat:last-child { border-right: 0; }
+.stat-num {
+  display: block;
+  font-family: var(--mono);
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.stat-lab {
+  display: block;
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-top: 3px;
+}
+#s-asignados { color: var(--ok); }
+#s-pendientes { color: var(--hagp); }
+#s-libres { color: var(--ink); }
+.stat-num.tick { animation: tick .34s cubic-bezier(.32,1.5,.6,1); }
+@keyframes tick { 0%{transform:scale(1)} 45%{transform:scale(1.22)} 100%{transform:scale(1)} }
+
+.head-actions { display: flex; gap: 9px; flex-wrap: wrap; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 15px;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, transform .1s;
+}
+.btn:hover { background: var(--surface-2); border-color: var(--ink-3); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.btn svg { width: 15px; height: 15px; flex: none; }
+
+.btn-solid {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: var(--surface);
+}
+.btn-solid:hover { background: var(--ok); border-color: var(--ok); filter: brightness(1.08); }
+
+/* Botón de tema: solo icono. En tema oscuro muestra el sol (para pasar a claro),
+   en tema claro muestra la luna. aplicarTema() fija data-theme en la raíz. */
+.btn-icon { padding: 9px; }
+.btn-icon .ico-sol,
+.btn-icon .ico-luna { display: none; }
+:root[data-theme="dark"]  .btn-icon .ico-sol  { display: block; }
+:root[data-theme="light"] .btn-icon .ico-luna { display: block; }
+/* Fallback antes de que corra el JS: seguir al sistema */
+:root:not([data-theme]) .btn-icon .ico-luna { display: block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .btn-icon .ico-luna { display: none; }
+  :root:not([data-theme]) .btn-icon .ico-sol  { display: block; }
+}
+
+/* ============================================================
+   TABLERO
+   ============================================================ */
+.board {
+  display: grid;
+  grid-template-columns: minmax(330px, 400px) 1fr;
+  gap: 18px;
+  padding: 18px 28px 28px;
+  align-items: stretch;
+  /* Una sola altura para ambos lados: es lo que alinea el borde inferior
+     de las sedes con el de la nomina. Se adapta al alto del marco. */
+  --alto-tablero: clamp(440px, calc(100vh - 215px), 780px);
+}
+
+.board > section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: var(--alto-tablero);
+}
+
+.col-head {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  /* Alto fijo: si un encabezado creciera, su panel arrancaria mas abajo
+     que el otro y los bordes inferiores dejarian de coincidir. */
+  height: 22px;
+  margin-bottom: 11px;
+  overflow: hidden;
+}
+.col-head h2 {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin: 0;
+}
+.count-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 9px;
+}
+.col-head .note {
+  margin: 0 0 0 auto;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Nómina ---------- */
+.roster {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.roster.drop-active { border-color: var(--hagp); box-shadow: 0 0 0 3px color-mix(in srgb, var(--hagp) 20%, transparent); }
+
+.search-row {
+  flex: none;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--surface-2);
+}
+#buscar {
+  width: 100%;
+  padding: 8px 11px;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+#buscar::placeholder { color: var(--ink-3); }
+#buscar:focus { outline: 2px solid var(--focus); outline-offset: -1px; border-color: transparent; }
+
+.stack {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* ---------- Ficha ---------- */
+.rec {
+  flex: none;
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--surface);
+  cursor: grab;
+  transition: background .13s;
+}
+.rec:last-child { border-bottom: 0; }
+.rec:hover { background: var(--surface-2); }
+.rec.dragging { opacity: .4; }
+.rec.picked { background: color-mix(in srgb, var(--hng) 12%, var(--surface)); }
+.rec.picked .rec-rail { background: var(--hng); }
+
+.rec-rail {
+  background: var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--surface);
+  writing-mode: vertical-rl;
+  letter-spacing: .06em;
+  transition: background .13s;
+}
+
+.rec-main { padding: 9px 12px; min-width: 0; }
+
+.rec-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+.rec-id { min-width: 0; flex: 1; }
+
+.rec-name {
+  font-family: var(--serif);
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -.008em;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rec-given {
+  font-size: 11.5px;
+  color: var(--ink-2);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* GPA: el dato que ordena la nómina, destacado en cada ficha */
+.rec-gpa {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--heom) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--heom) 30%, transparent);
+}
+.gpa-num {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--heom);
+  font-variant-numeric: tabular-nums;
+}
+.gpa-lab {
+  font-size: 8.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
+.rec-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 14px;
+  margin: 0;
+  padding-top: 7px;
+  border-top: 1px dotted var(--line);
+}
+.rec-fields .span2 { grid-column: 1 / -1; }
+.rec-fields dt {
+  font-size: 9px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.rec-fields dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.no-hits {
+  padding: 26px 16px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.roster-done {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 40px 20px;
+  text-align: center;
+}
+.roster-done .mark {
+  font-family: var(--serif);
+  font-size: 24px;
+  color: var(--ok);
+}
+.roster-done strong { font-size: 13.5px; }
+.roster-done span { font-size: 12px; color: var(--ink-3); }
+
+/* ---------- Sedes ---------- */
+.wards {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ward {
+  --wc: var(--heom);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--wc);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: box-shadow .15s, border-color .15s, transform .15s;
+}
+.ward.drop-active {
+  border-color: var(--wc);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wc) 24%, transparent), var(--shadow-md);
+  transform: translateY(-2px);
+}
+.ward.refuse { animation: refuse .4s cubic-bezier(.36,.07,.19,.97); }
+@keyframes refuse {
+  15%,85% { transform: translateX(-3px); }
+  30%,70% { transform: translateX(5px); }
+  45%,55% { transform: translateX(-6px); }
+}
+
+.ward-head { padding: 12px 13px 11px; }
+
+.ward-kicker {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--wc);
+  margin: 0 0 4px;
+}
+.ward-head h3 {
+  font-family: var(--serif);
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -.01em;
+  text-wrap: balance;
+  margin: 0;
+  min-height: 2.5em;
+}
+
+.ward-tally {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: 10px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.tally-free { font-size: 24px; font-weight: 600; color: var(--wc); line-height: 1; }
+.tally-of { font-size: 12px; color: var(--ink-3); }
+.tally-word {
+  font-family: var(--sans);
+  font-size: 10px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-left: auto;
+}
+
+/* Tira segmentada: un segmento por plaza, contable a simple vista */
+.beds {
+  display: flex;
+  gap: 2px;
+  margin-top: 9px;
+  height: 9px;
+}
+.bed {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 1.5px;
+  background: var(--line);
+  transition: background .22s ease;
+}
+.bed.taken { background: var(--wc); }
+
+.ward-full {
+  display: inline-block;
+  margin-top: 9px;
+  padding: 2px 8px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--surface);
+  background: var(--wc);
+  border-radius: 3px;
+}
+
+.ward-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--line-soft);
+  background: var(--paper);
+}
+
+.ward-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 96px;
+  padding: 14px;
+  text-align: center;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+.ward.drop-active .ward-empty { color: var(--wc); }
+
+.slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--surface);
+  cursor: grab;
+  transition: background .13s;
+}
+.slot:last-child { border-bottom: 0; }
+.slot:hover { background: var(--surface-2); }
+.slot.dragging { opacity: .4; }
+
+.slot-n {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+  width: 16px;
+}
+.slot-name { min-width: 0; flex: 1; }
+.slot-name b {
+  display: block;
+  font-family: var(--serif);
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.slot-name span {
+  display: block;
+  font-size: 10.5px;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.slot-gpa {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--wc, var(--heom));
+  font-variant-numeric: tabular-nums;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--wc, var(--heom)) 12%, transparent);
+}
+.slot-pull {
+  flex: none;
+  width: 20px; height: 20px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--ink-3);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background .13s, color .13s;
+}
+.slot-pull:hover { background: color-mix(in srgb, var(--alert) 15%, transparent); color: var(--alert); }
+
+.ward-foot { padding: 9px 10px; border-top: 1px solid var(--line-soft); }
+.btn-ward {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 10px;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--wc);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--wc) 45%, transparent);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .14s;
+}
+.btn-ward:hover:not(:disabled) { background: color-mix(in srgb, var(--wc) 12%, transparent); }
+.btn-ward:disabled { opacity: .4; cursor: not-allowed; }
+.btn-ward svg { width: 13px; height: 13px; }
+
+/* ============================================================
+   AVISOS
+   ============================================================ */
+.notices {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 40;
+  pointer-events: none;
+}
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 380px;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ok);
+  border-radius: 6px;
+  box-shadow: var(--shadow-md);
+  animation: slidein .26s cubic-bezier(.32,1.4,.6,1);
+}
+.notice.bad { border-left-color: var(--alert); }
+
+/* Enlace de respaldo: debe poder pulsarse, a diferencia del resto de avisos */
+.notice.respaldo {
+  pointer-events: auto;
+  gap: 7px;
+  border-left-color: var(--hng);
+  animation: none;
+}
+.respaldo-link {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--hng);
+  text-decoration: underline;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.respaldo-x {
+  margin-left: auto;
+  flex: none;
+  width: 20px; height: 20px;
+  display: grid; place-items: center;
+  font-size: 15px; line-height: 1;
+  color: var(--ink-3);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.respaldo-x:hover { background: var(--surface-2); color: var(--ink); }
+.notice.plain { border-left-color: var(--ink-3); }
+.notice.leaving { animation: slideout .22s ease forwards; }
+@keyframes slidein { from { opacity: 0; transform: translateX(26px); } }
+@keyframes slideout { to { opacity: 0; transform: translateX(26px); } }
+
+/* ============================================================
+   ACCESO
+   ============================================================ */
+.acceso {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--paper);
+}
+.acceso-caja {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 360px;
+  padding: 26px 24px 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--heom);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+}
+.acceso-caja h2 {
+  font-family: var(--serif);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -.015em;
+  margin: 0 0 6px;
+}
+.acceso-nota {
+  margin: 0 0 18px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.acceso-caja label {
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 5px;
+}
+.acceso-caja input {
+  padding: 9px 11px;
+  margin-bottom: 14px;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.acceso-caja input:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: -1px;
+  border-color: transparent;
+}
+.acceso-error {
+  display: none;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--alert);
+  background: color-mix(in srgb, var(--alert) 10%, transparent);
+  border-left: 3px solid var(--alert);
+  border-radius: 4px;
+}
+.acceso-caja .btn { justify-content: center; }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1080px) {
+  /* En una sola columna ya no hay nada con que alinearse: cada panel
+     recupera su alto propio. */
+  .board { grid-template-columns: 1fr; }
+  .board > section { height: auto; }
+  .stack { max-height: 420px; }
+  .ward-list { max-height: 320px; }
+  .col-head { height: auto; }
+  .col-head .note { display: none; }
+}
+@media (max-width: 720px) {
+  .wards { grid-template-columns: 1fr; }
+  .board, .board-head { padding-left: 16px; padding-right: 16px; }
+  .board-head h1 { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+<header class="board-head">
+  <div class="title-block">
+    <p class="eyebrow">Internado rotativo &middot; Guayaquil</p>
+    <h1>Selección de Plazas Hospitalarias</h1>
+    <p class="lede">
+      Arrastra cada postulante de la nómina a una sede. Cada plaza ocupada apaga un
+      segmento del contador; al llegar a cero la sede deja de admitir.
+    </p>
+  </div>
+
+  <div class="summary" role="group" aria-label="Resumen de asignación">
+    <div class="stat"><span class="stat-num" id="s-asignados">0</span><span class="stat-lab">Asignados</span></div>
+    <div class="stat"><span class="stat-num" id="s-pendientes">0</span><span class="stat-lab">Pendientes</span></div>
+    <div class="stat"><span class="stat-num" id="s-libres">0</span><span class="stat-lab">Plazas libres</span></div>
+  </div>
+
+  <div class="head-actions">
+    <button class="btn btn-icon" id="btn-tema" type="button" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema">
+      <svg class="ico-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <svg class="ico-luna" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+    </button>
+    <button class="btn" id="btn-salir" type="button" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+      Salir
+    </button>
+    <button class="btn" id="btn-reset" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+      Vaciar tablero
+    </button>
+    <button class="btn btn-solid" id="btn-todo" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+      Descargar consolidado
+    </button>
+  </div>
+</header>
+
+
+<main class="board">
+
+  <section aria-labelledby="h-nomina">
+    <div class="col-head">
+      <h2 id="h-nomina">Nómina</h2>
+      <span class="count-chip" id="chip-nomina">0</span>
+      <p class="note">Ordenada por GPA (mayor prioridad primero)</p>
+    </div>
+
+    <div class="roster" id="roster">
+      <div class="search-row">
+        <input type="text" id="buscar" placeholder="Buscar por apellido, código, cédula o correo…" autocomplete="off" aria-label="Buscar postulante">
+      </div>
+      <div class="stack" id="stack"></div>
+      <div class="roster-done" id="nomina-lista">
+        <span class="mark">&#10003;</span>
+        <strong>Nómina completa</strong>
+        <span>Los 64 postulantes tienen sede asignada.</span>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-sedes">
+    <div class="col-head">
+      <h2 id="h-sedes">Sedes</h2>
+      <span class="count-chip" id="chip-sedes">0</span>
+      <p class="note">Arrastra una ficha de vuelta a la nómina para liberar su plaza</p>
+    </div>
+    <div class="wards" id="wards"></div>
+  </section>
+
+</main>
+
+<div class="notices" id="notices" aria-live="polite"></div>
+
+<!-- Solo aparece cuando la página está conectada a la tabla -->
+<div class="acceso" id="acceso">
+  <form class="acceso-caja" id="acceso-form">
+    <p class="eyebrow">Acceso restringido</p>
+    <h2>Tablero de plazas</h2>
+    <p class="acceso-nota">Los datos de los postulantes solo se cargan tras iniciar sesión.</p>
+
+    <label for="acceso-correo">Correo</label>
+    <input type="email" id="acceso-correo" autocomplete="username" required>
+
+    <label for="acceso-clave">Contraseña</label>
+    <input type="password" id="acceso-clave" autocomplete="current-password" required>
+
+    <p class="acceso-error" id="acceso-error"></p>
+    <button type="submit" class="btn btn-solid" id="acceso-enviar">Entrar</button>
+  </form>
+</div>
+
+
+<script>
+/* ============================================================
+   DATOS
+   ============================================================ */
+/**
+ * Configuracion de Supabase. Se rellena en el build desde src/config.json.
+ * La anon key esta pensada para ser publica: lo que protege los datos es RLS,
+ * que solo deja leer a usuarios autenticados. La contrasena no vive aqui:
+ * la pide el formulario de acceso en cada sesion.
+ *
+ * Si queda vacia, la pagina funciona en modo local con los datos incrustados
+ * y las asignaciones guardadas en el navegador.
+ */
+const SUPABASE = {"url":"https://zjnvwnyulhaxevpmosns.supabase.co","anonKey":"sb_publishable_Ugc1kW8AOBOlSk29ogTRIg_bYBBe2YP"};
+const MODO_REMOTO = Boolean(SUPABASE.url && SUPABASE.anonKey);
+
+let ESTUDIANTES = [];
+
+const SEDES = [
+  { id:'heom', nombre:'Hospital Enrique Ortega Moreira', plazas:30, token:'--heom', xlsx:'2E6E5E', hoja:'Enrique Ortega Moreira' },
+  { id:'hng',  nombre:'Hospital Naval Guayaquil',        plazas:19, token:'--hng',  xlsx:'33578F', hoja:'Naval Guayaquil' },
+  { id:'hagp', nombre:'Hospital Abel Gilbert Pontón',    plazas:15, token:'--hagp', xlsx:'A85434', hoja:'Abel Gilbert Pontón' }
+];
+
+const LLAVE = 'plazas.tablero.v2';
+
+const estado = {
+  asignado: {},   // { idEstudiante: idSede }
+  orden: {},      // { idSede: [idEstudiante] }
+  filtro: '',
+  fijado: null,
+  arrastrando: null
+};
+SEDES.forEach(s => { estado.orden[s.id] = []; });
+
+/* ============================================================
+   UTILIDADES
+   ============================================================ */
+const $ = sel => document.querySelector(sel);
+
+/* ------------------------------------------------------------------ tema */
+const LLAVE_TEMA = 'plazas.tema.v1';
+
+function aplicarTema(tema, persistir = true) {
+  // tema: 'claro' | 'oscuro'. Se fija en la raíz para que gane sobre el media query.
+  // Solo se guarda cuando es una elección explícita: si se persistiera el tema
+  // derivado del sistema en la primera visita, la página dejaría de seguir al SO.
+  document.documentElement.setAttribute('data-theme', tema === 'oscuro' ? 'dark' : 'light');
+  if (persistir) {
+    try { localStorage.setItem(LLAVE_TEMA, tema); } catch (_) { /* sin almacenamiento */ }
+  }
+}
+
+function temaInicial() {
+  let guardado;
+  try { guardado = localStorage.getItem(LLAVE_TEMA); } catch (_) { /* */ }
+  if (guardado === 'claro' || guardado === 'oscuro') return guardado;
+  // Sin preferencia: seguir al sistema
+  const oscuroSistema = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return oscuroSistema ? 'oscuro' : 'claro';
+}
+
+function alternarTema() {
+  const actual = document.documentElement.getAttribute('data-theme') === 'dark' ? 'oscuro' : 'claro';
+  aplicarTema(actual === 'oscuro' ? 'claro' : 'oscuro');
+}
+
+// Se aplica de inmediato para evitar parpadeo. Sin persistir: si no hay elección
+// previa, cada visita vuelve a derivar el tema del sistema.
+aplicarTema(temaInicial(), false);
+
+// Mientras no exista elección explícita, seguir en vivo los cambios del sistema.
+if (window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (ev) => {
+    let guardado;
+    try { guardado = localStorage.getItem(LLAVE_TEMA); } catch (_) { /* */ }
+    if (guardado !== 'claro' && guardado !== 'oscuro') {
+      aplicarTema(ev.matches ? 'oscuro' : 'claro', false);
+    }
+  });
+}
+
+const porId = id => ESTUDIANTES.find(e => String(e.id) === String(id));
+const sedePorId = id => SEDES.find(s => s.id === id);
+const ocupadas = sedeId => Object.values(estado.asignado).filter(v => v === sedeId).length;
+
+function aviso(texto, tipo = 'plain') {
+  const n = document.createElement('div');
+  n.className = 'notice ' + tipo;
+  n.textContent = texto;
+  $('#notices').appendChild(n);
+  setTimeout(() => {
+    n.classList.add('leaving');
+    setTimeout(() => n.remove(), 240);
+  }, 2500);
+}
+
+function guardar() {
+  try { localStorage.setItem(LLAVE, JSON.stringify({ a: estado.asignado, o: estado.orden })); }
+  catch (_) { /* almacenamiento no disponible */ }
+}
+
+function recuperar() {
+  let datos;
+  try { datos = JSON.parse(localStorage.getItem(LLAVE) || 'null'); }
+  catch (_) { return; }
+  if (!datos) return;
+
+  const limpio = {};
+  Object.entries(datos.a || {}).forEach(([eid, sid]) => {
+    if (porId(eid) && sedePorId(sid)) limpio[eid] = sid;
+  });
+  // No confiar en los conteos guardados: recortar a la capacidad real de cada sede
+  const cupo = {};
+  const final = {};
+  Object.entries(limpio).forEach(([eid, sid]) => {
+    cupo[sid] = (cupo[sid] || 0) + 1;
+    if (cupo[sid] <= sedePorId(sid).plazas) final[eid] = sid;
+  });
+
+  estado.asignado = final;
+  SEDES.forEach(s => {
+    const previo = (datos.o && datos.o[s.id]) || [];
+    estado.orden[s.id] = previo.filter(eid => final[eid] === s.id);
+    Object.keys(final).forEach(eid => {
+      if (final[eid] === s.id && !estado.orden[s.id].includes(eid)) estado.orden[s.id].push(eid);
+    });
+  });
+}
+
+/* ============================================================
+   ACCESO A LA TABLA (Supabase REST, sin librerias)
+   ============================================================ */
+const LLAVE_SESION = 'plazas.sesion.v1';
+let sesion = null;
+
+function guardarSesion(s) {
+  sesion = s;
+  try {
+    if (s) localStorage.setItem(LLAVE_SESION, JSON.stringify(s));
+    else localStorage.removeItem(LLAVE_SESION);
+  } catch (_) { /* almacenamiento no disponible */ }
+
+  // Sesión cerrada o expirada: borrar los datos de memoria y del DOM. Si no,
+  // en una PC compartida la siguiente persona podría quitar el overlay de
+  // acceso y leer todo lo que quedó cargado detrás.
+  if (!s && MODO_REMOTO) {
+    ESTUDIANTES = [];
+    estado.asignado = {};
+    estado.fijado = null;
+    SEDES.forEach((x) => { estado.orden[x.id] = []; });
+    pintar();
+  }
+}
+
+function recuperarSesion() {
+  try {
+    const s = JSON.parse(localStorage.getItem(LLAVE_SESION) || 'null');
+    // expires_at viene en segundos; se descarta si ya venció
+    if (s && s.expires_at && s.expires_at * 1000 > Date.now()) sesion = s;
+  } catch (_) { /* sesion corrupta */ }
+}
+
+async function api(ruta, opciones) {
+  const cfg = opciones || {};
+  const res = await fetch(SUPABASE.url + ruta, {
+    method: cfg.method || 'GET',
+    headers: Object.assign({
+      apikey: SUPABASE.anonKey,
+      Authorization: 'Bearer ' + (sesion ? sesion.access_token : SUPABASE.anonKey),
+      'Content-Type': 'application/json'
+    }, cfg.headers || {}),
+    body: cfg.body
+  });
+
+  if (res.status === 401 || res.status === 403) {
+    guardarSesion(null);
+    mostrarAcceso('La sesión expiró. Ingresa de nuevo.');
+    throw new Error('sesión no válida');
+  }
+  if (!res.ok) {
+    const txt = await res.text();
+    // El trigger de cupo devuelve su mensaje aquí
+    throw new Error(txt.slice(0, 200) || ('Error ' + res.status));
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+async function autenticar(correo, clave) {
+  const res = await fetch(SUPABASE.url + '/auth/v1/token?grant_type=password', {
+    method: 'POST',
+    headers: { apikey: SUPABASE.anonKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: correo, password: clave })
+  });
+  const datos = await res.json();
+  if (!res.ok) {
+    throw new Error(datos.error_description || datos.msg || 'Correo o contraseña incorrectos');
+  }
+  guardarSesion(datos);
+}
+
+/** La tabla usa snake_case; la interfaz, camelCase. */
+function desdeFila(f) {
+  return {
+    id: String(f.id),
+    apellidos: f.apellidos || '',
+    nombres: f.nombres || '',
+    codigo: f.codigo || '',
+    cedula: f.cedula || '',
+    correoInst: f.correo_inst || '',
+    correoPers: f.correo_pers || '',
+    celular: f.celular || '',
+    gpa: f.gpa != null ? Number(f.gpa) : null,
+    sedeId: f.sede_id || null
+  };
+}
+
+async function cargarDesdeTabla() {
+  const sedes = await api('/rest/v1/sedes?select=id,nombre,plazas,orden&order=orden');
+  // Orden por GPA descendente: es la prioridad de selección de plaza.
+  const filas = await api('/rest/v1/estudiantes?select=*&order=gpa.desc.nullslast');
+
+  // Las plazas mandan desde la tabla; el color y el nombre corto son de la interfaz
+  sedes.forEach((s) => {
+    const local = SEDES.find((x) => x.id === s.id);
+    if (local) {
+      local.nombre = s.nombre;
+      local.plazas = s.plazas;
+    }
+  });
+
+  ESTUDIANTES = filas.map(desdeFila);
+
+  estado.asignado = {};
+  SEDES.forEach((s) => { estado.orden[s.id] = []; });
+  ESTUDIANTES.forEach((e) => {
+    if (e.sedeId && SEDES.some((s) => s.id === e.sedeId)) {
+      estado.asignado[e.id] = e.sedeId;
+      estado.orden[e.sedeId].push(e.id);
+    }
+  });
+}
+
+/** Escribe la sede de un estudiante. sedeId null = liberar la plaza. */
+function escribirSede(estudianteId, sedeId) {
+  return api('/rest/v1/estudiantes?id=eq.' + encodeURIComponent(estudianteId), {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ sede_id: sedeId })
+  });
+}
+
+/**
+ * Persiste un cambio. En local basta con localStorage; contra la tabla se
+ * escribe de inmediato y, si falla, se revierte para que la pantalla nunca
+ * muestre algo que la base no aceptó.
+ */
+async function persistir(estudianteId, sedeId, revertir) {
+  if (!MODO_REMOTO) { guardar(); return true; }
+  try {
+    await escribirSede(estudianteId, sedeId);
+    return true;
+  } catch (err) {
+    revertir();
+    pintar();
+    const msg = /plazas libres/i.test(err.message)
+      ? 'La sede ya no tiene plazas libres'
+      : 'No se pudo guardar: ' + err.message;
+    aviso(msg, 'bad');
+    return false;
+  }
+}
+
+/* ============================================================
+   ACCIONES
+   ============================================================ */
+function fijar(id) {
+  estado.fijado = String(estado.fijado) === String(id) ? null : String(id);
+  pintarNomina();
+  if (estado.fijado) aviso('Postulante fijado — ahora elige una sede');
+}
+
+function asignar(estudianteId, sedeId) {
+  const eid = String(estudianteId);
+  const est = porId(eid);
+  const sede = sedePorId(sedeId);
+  if (!est || !sede) return false;
+  if (estado.asignado[eid] === sedeId) return false;
+
+  if (ocupadas(sedeId) >= sede.plazas) {
+    const nodo = $('#wards [data-sede="' + sedeId + '"]');
+    if (nodo) { nodo.classList.remove('refuse'); void nodo.offsetWidth; nodo.classList.add('refuse'); }
+    aviso(sede.nombre + ' ya no tiene plazas libres', 'bad');
+    return false;
+  }
+
+  const previa = estado.asignado[eid];
+
+  if (previa) estado.orden[previa] = estado.orden[previa].filter(x => x !== eid);
+
+  estado.asignado[eid] = sedeId;
+  if (!estado.orden[sedeId].includes(eid)) estado.orden[sedeId].push(eid);
+
+  estado.fijado = null;
+  pintar();
+  aviso(est.apellidos + ' → ' + sede.nombre, 'ok');
+
+  // Reversión quirúrgica: solo deshace ESTE movimiento, y únicamente si el
+  // estudiante sigue donde lo pusimos. Si mientras la escritura viajaba se movió
+  // de nuevo, el revert quedó obsoleto y no debe tocar el estado actual.
+  persistir(eid, sedeId, () => {
+    if (estado.asignado[eid] !== sedeId) return;
+    estado.orden[sedeId] = estado.orden[sedeId].filter(x => x !== eid);
+    if (previa) {
+      estado.asignado[eid] = previa;
+      if (!estado.orden[previa].includes(eid)) estado.orden[previa].push(eid);
+    } else {
+      delete estado.asignado[eid];
+    }
+  });
+  return true;
+}
+
+function liberar(estudianteId) {
+  const eid = String(estudianteId);
+  const sid = estado.asignado[eid];
+  if (!sid) return;
+
+  delete estado.asignado[eid];
+  estado.orden[sid] = estado.orden[sid].filter(x => x !== eid);
+  pintar();
+  aviso(porId(eid).apellidos + ' volvió a la nómina');
+
+  // Reversión quirúrgica: reponer solo a este estudiante en su sede, y solo si
+  // sigue libre (no se reasignó mientras la liberación viajaba).
+  persistir(eid, null, () => {
+    if (estado.asignado[eid]) return;
+    estado.asignado[eid] = sid;
+    if (!estado.orden[sid].includes(eid)) estado.orden[sid].push(eid);
+  });
+}
+
+function vaciar() {
+  if (!Object.keys(estado.asignado).length) { aviso('El tablero ya está vacío'); return; }
+  if (!confirm('¿Devolver los 64 postulantes a la nómina y liberar todas las plazas?')) return;
+
+  const asignadosPrevios = Object.keys(estado.asignado);
+  estado.asignado = {};
+  SEDES.forEach(s => { estado.orden[s.id] = []; });
+  estado.fijado = null;
+  pintar();
+
+  if (!MODO_REMOTO) { guardar(); aviso('Tablero vaciado'); return; }
+
+  // Un solo PATCH para todas las filas asignadas
+  api('/rest/v1/estudiantes?sede_id=not.is.null', {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ sede_id: null })
+  }).then(() => {
+    aviso('Tablero vaciado (' + asignadosPrevios.length + ' plazas liberadas)');
+  }).catch(err => {
+    aviso('No se pudo vaciar: ' + err.message, 'bad');
+    arrancar();   // recarga desde la tabla para no quedar desincronizado
+  });
+}
+
+/* ============================================================
+   ARRASTRE
+   ============================================================ */
+function hacerArrastrable(nodo, id) {
+  nodo.draggable = true;
+  nodo.addEventListener('dragstart', ev => {
+    estado.arrastrando = String(id);
+    nodo.classList.add('dragging');
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', String(id));
+  });
+  nodo.addEventListener('dragend', () => {
+    estado.arrastrando = null;
+    nodo.classList.remove('dragging');
+    document.querySelectorAll('.drop-active').forEach(n => n.classList.remove('drop-active'));
+  });
+}
+
+/* ============================================================
+   PINTADO
+   ============================================================ */
+function fichaNomina(est) {
+  const art = document.createElement('article');
+  art.className = 'rec';
+  if (String(estado.fijado) === String(est.id)) art.classList.add('picked');
+
+  const rail = document.createElement('div');
+  rail.className = 'rec-rail';
+  rail.textContent = est.id;
+
+  const main = document.createElement('div');
+  main.className = 'rec-main';
+  main.innerHTML =
+    '<div class="rec-top">' +
+      '<div class="rec-id"><h3 class="rec-name"></h3><p class="rec-given"></p></div>' +
+      '<div class="rec-gpa"><span class="gpa-num"></span><span class="gpa-lab">GPA</span></div>' +
+    '</div>' +
+    '<dl class="rec-fields">' +
+      '<div><dt>Código</dt><dd data-k="codigo"></dd></div>' +
+      '<div><dt>Cédula</dt><dd data-k="cedula"></dd></div>' +
+      '<div class="span2"><dt>Correo institucional</dt><dd data-k="correoInst"></dd></div>' +
+      '<div class="span2"><dt>Correo personal</dt><dd data-k="correoPers"></dd></div>' +
+      '<div><dt>Celular</dt><dd data-k="celular"></dd></div>' +
+    '</dl>';
+  main.querySelector('.rec-name').textContent = est.apellidos;
+  main.querySelector('.rec-given').textContent = est.nombres;
+  main.querySelector('.gpa-num').textContent = est.gpa != null ? Number(est.gpa).toFixed(2) : '—';
+  main.querySelectorAll('[data-k]').forEach(dd => {
+    const v = est[dd.dataset.k] || '—';
+    dd.textContent = v;
+    dd.title = v;
+  });
+
+  art.append(rail, main);
+  art.addEventListener('click', () => fijar(est.id));
+  hacerArrastrable(art, est.id);
+  return art;
+}
+
+function fichaSede(est, indice) {
+  const fila = document.createElement('div');
+  fila.className = 'slot';
+
+  const n = document.createElement('span');
+  n.className = 'slot-n';
+  n.textContent = indice;
+
+  const nom = document.createElement('div');
+  nom.className = 'slot-name';
+  const b = document.createElement('b');
+  b.textContent = est.apellidos;
+  b.title = est.apellidos + ' ' + est.nombres;
+  const sp = document.createElement('span');
+  sp.textContent = est.nombres;
+  nom.append(b, sp);
+
+  const gpa = document.createElement('span');
+  gpa.className = 'slot-gpa';
+  gpa.textContent = est.gpa != null ? Number(est.gpa).toFixed(2) : '—';
+  gpa.title = 'GPA ' + gpa.textContent;
+
+  // El botón se construye aquí, no se oculta con CSS: no puede aparecer donde no debe
+  const quitar = document.createElement('button');
+  quitar.type = 'button';
+  quitar.className = 'slot-pull';
+  quitar.title = 'Liberar esta plaza';
+  quitar.setAttribute('aria-label', 'Liberar la plaza de ' + est.apellidos);
+  quitar.textContent = '×';
+  quitar.addEventListener('click', ev => { ev.stopPropagation(); liberar(est.id); });
+
+  fila.append(n, nom, gpa, quitar);
+  hacerArrastrable(fila, est.id);
+  return fila;
+}
+
+function pintarNomina() {
+  const q = estado.filtro.trim().toLowerCase();
+  const libres = ESTUDIANTES.filter(e => !estado.asignado[e.id]);
+  const visibles = q
+    ? libres.filter(e => [e.apellidos, e.nombres, e.codigo, e.cedula, e.correoInst, e.correoPers, e.celular, e.gpa]
+        .join(' ').toLowerCase().includes(q))
+    : libres;
+
+  // Si el postulante fijado deja de estar visible, se suelta: de lo contrario
+  // un clic en una sede lo asignaria sin que hubiera nada marcado en pantalla.
+  if (estado.fijado && !visibles.some(e => String(e.id) === String(estado.fijado))) {
+    estado.fijado = null;
+  }
+
+  const stack = $('#stack');
+  stack.textContent = '';
+  visibles.forEach(e => stack.appendChild(fichaNomina(e)));
+
+  if (libres.length && !visibles.length) {
+    const p = document.createElement('p');
+    p.className = 'no-hits';
+    p.textContent = 'Ningún postulante coincide con «' + estado.filtro.trim() + '».';
+    stack.appendChild(p);
+  }
+
+  // Estilo en línea: gana sobre la hoja de estilos, así el cartel de
+  // "nómina completa" no puede aparecer con postulantes aún pendientes.
+  const completa = libres.length === 0;
+  $('#nomina-lista').style.display = completa ? 'flex' : 'none';
+  stack.style.display = completa ? 'none' : 'flex';
+  $('#chip-nomina').textContent = q ? visibles.length + ' / ' + libres.length : String(libres.length);
+}
+
+function pintarSedes() {
+  const cont = $('#wards');
+
+  // El re-render recrea cada lista, asi que su scroll se perderia: al asignar
+  // el postulante 20 la columna saltaria al inicio en cada movimiento.
+  const scrolls = {};
+  cont.querySelectorAll('.ward').forEach(w => {
+    const l = w.querySelector('.ward-list');
+    if (l && l.scrollTop) scrolls[w.dataset.sede] = l.scrollTop;
+  });
+
+  cont.textContent = '';
+
+  SEDES.forEach(sede => {
+    const usadas = ocupadas(sede.id);
+    const libres = sede.plazas - usadas;
+
+    const nodo = document.createElement('div');
+    nodo.className = 'ward';
+    nodo.dataset.sede = sede.id;
+    nodo.style.setProperty('--wc', 'var(' + sede.token + ')');
+
+    const cab = document.createElement('div');
+    cab.className = 'ward-head';
+    cab.innerHTML =
+      '<p class="ward-kicker">Sede</p><h3></h3>' +
+      '<div class="ward-tally">' +
+        '<span class="tally-free"></span>' +
+        '<span class="tally-of"></span>' +
+        '<span class="tally-word">libres</span>' +
+      '</div>' +
+      '<div class="beds"></div>';
+    cab.querySelector('h3').textContent = sede.nombre;
+    cab.querySelector('.tally-free').textContent = libres;
+    cab.querySelector('.tally-of').textContent = '/ ' + sede.plazas;
+
+    const beds = cab.querySelector('.beds');
+    for (let i = 0; i < sede.plazas; i++) {
+      const b = document.createElement('span');
+      b.className = 'bed' + (i < usadas ? ' taken' : '');
+      beds.appendChild(b);
+    }
+    if (libres === 0) {
+      const tag = document.createElement('span');
+      tag.className = 'ward-full';
+      tag.textContent = 'Cupo completo';
+      cab.appendChild(tag);
+    }
+
+    const lista = document.createElement('div');
+    lista.className = 'ward-list';
+    const asignados = estado.orden[sede.id].map(porId).filter(Boolean);
+    if (!asignados.length) {
+      const vac = document.createElement('p');
+      vac.className = 'ward-empty';
+      vac.textContent = 'Suelta aquí a los postulantes — ' + sede.plazas + ' plazas por cubrir';
+      lista.appendChild(vac);
+    } else {
+      asignados.forEach((e, i) => lista.appendChild(fichaSede(e, i + 1)));
+    }
+
+    const pie = document.createElement('div');
+    pie.className = 'ward-foot';
+    const bt = document.createElement('button');
+    bt.type = 'button';
+    bt.className = 'btn-ward';
+    bt.disabled = usadas === 0;
+    bt.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
+    bt.append(document.createTextNode(' Excel de la sede (' + usadas + ')'));
+    bt.addEventListener('click', ev => { ev.stopPropagation(); exportarSede(sede, bt); });
+    pie.appendChild(bt);
+
+    nodo.append(cab, lista, pie);
+
+    nodo.addEventListener('dragover', ev => {
+      if (!estado.arrastrando) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'move';
+      nodo.classList.add('drop-active');
+    });
+    nodo.addEventListener('dragleave', ev => {
+      if (!nodo.contains(ev.relatedTarget)) nodo.classList.remove('drop-active');
+    });
+    nodo.addEventListener('drop', ev => {
+      ev.preventDefault();
+      nodo.classList.remove('drop-active');
+      const eid = ev.dataTransfer.getData('text/plain') || estado.arrastrando;
+      if (eid) asignar(eid, sede.id);
+    });
+    nodo.addEventListener('click', ev => {
+      if (ev.target.closest('.slot') || ev.target.closest('.btn-ward')) return;
+      if (estado.fijado) asignar(estado.fijado, sede.id);
+    });
+
+    cont.appendChild(nodo);
+    // Restaurar despues de insertar: sobre un nodo fuera del documento no surte efecto.
+    if (scrolls[sede.id]) lista.scrollTop = scrolls[sede.id];
+  });
+}
+
+function marcar(nodo, valor) {
+  if (nodo.textContent === String(valor)) return;
+  nodo.textContent = valor;
+  nodo.classList.remove('tick');
+  void nodo.offsetWidth;
+  nodo.classList.add('tick');
+}
+
+function pintarResumen() {
+  const asignados = Object.keys(estado.asignado).length;
+  const plazas = SEDES.reduce((a, s) => a + s.plazas, 0);
+  marcar($('#s-asignados'), asignados);
+  marcar($('#s-pendientes'), ESTUDIANTES.length - asignados);
+  marcar($('#s-libres'), plazas - asignados);
+  $('#chip-sedes').textContent = (plazas - asignados) + ' / ' + plazas + ' plazas';
+}
+
+function pintar() { pintarNomina(); pintarSedes(); pintarResumen(); }
+
+/* ============================================================
+   GENERACIÓN DE XLSX (sin librerías externas)
+   Un .xlsx es un ZIP de XML. Se arma el ZIP con entradas
+   "stored" (sin compresión) y CRC32 calculado a mano.
+   ============================================================ */
+const TABLA_CRC = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[i] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = TABLA_CRC[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function armarZip(entradas) {
+  const cod = new TextEncoder();
+  const FECHA = ((2025 - 1980) << 9) | (1 << 5) | 1;
+  const HORA = 0;
+  const piezas = [];
+  const centrales = [];
+  let desplazamiento = 0;
+
+  entradas.forEach(e => {
+    const nombre = cod.encode(e.nombre);
+    const datos = e.bytes;
+    const crc = crc32(datos);
+
+    const local = new Uint8Array(30 + nombre.length);
+    const dv = new DataView(local.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(6, 0x0800, true);   // nombres en UTF-8
+    dv.setUint16(8, 0, true);        // método: stored
+    dv.setUint16(10, HORA, true);
+    dv.setUint16(12, FECHA, true);
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, datos.length, true);
+    dv.setUint32(22, datos.length, true);
+    dv.setUint16(26, nombre.length, true);
+    dv.setUint16(28, 0, true);
+    local.set(nombre, 30);
+
+    piezas.push(local, datos);
+    centrales.push({ nombre, crc, tam: datos.length, off: desplazamiento });
+    desplazamiento += local.length + datos.length;
+  });
+
+  const dirPiezas = [];
+  let dirTam = 0;
+  centrales.forEach(c => {
+    const h = new Uint8Array(46 + c.nombre.length);
+    const dv = new DataView(h.buffer);
+    dv.setUint32(0, 0x02014b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(6, 20, true);
+    dv.setUint16(8, 0x0800, true);
+    dv.setUint16(10, 0, true);
+    dv.setUint16(12, HORA, true);
+    dv.setUint16(14, FECHA, true);
+    dv.setUint32(16, c.crc, true);
+    dv.setUint32(20, c.tam, true);
+    dv.setUint32(24, c.tam, true);
+    dv.setUint16(28, c.nombre.length, true);
+    dv.setUint32(42, c.off, true);
+    h.set(c.nombre, 46);
+    dirPiezas.push(h);
+    dirTam += h.length;
+  });
+
+  const fin = new Uint8Array(22);
+  const dvf = new DataView(fin.buffer);
+  dvf.setUint32(0, 0x06054b50, true);
+  dvf.setUint16(8, centrales.length, true);
+  dvf.setUint16(10, centrales.length, true);
+  dvf.setUint32(12, dirTam, true);
+  dvf.setUint32(16, desplazamiento, true);
+
+  return new Blob([...piezas, ...dirPiezas, fin],
+    { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
+function esc(valor) {
+  const s = String(valor == null ? '' : valor);
+  let out = '';
+  for (const ch of s) {
+    const c = ch.codePointAt(0);
+    // XML 1.0 prohibe estos controles; dejarlos pasa corrompe el .xlsx.
+    if (c < 0x20 && c !== 0x09 && c !== 0x0A && c !== 0x0D) continue;
+    if (ch === '&') out += '&amp;';
+    else if (ch === '<') out += '&lt;';
+    else if (ch === '>') out += '&gt;';
+    else if (ch === '"') out += '&quot;';
+    else if (ch === "'") out += '&apos;';
+    else out += ch;
+  }
+  return out;
+}
+
+const bytes = txt => new TextEncoder().encode(txt);
+
+const COLS = [
+  { cab: 'N°',                    k: '_n',         ancho: 5 },
+  { cab: 'APELLIDOS',             k: 'apellidos',  ancho: 26 },
+  { cab: 'NOMBRES',               k: 'nombres',    ancho: 26 },
+  { cab: 'GPA',                   k: 'gpa',        ancho: 9 },
+  { cab: 'CÓDIGO',                k: 'codigo',     ancho: 14 },
+  { cab: 'N° DE CÉDULA',          k: 'cedula',     ancho: 15 },
+  { cab: 'CORREO INSTITUCIONAL',  k: 'correoInst', ancho: 32 },
+  { cab: 'CORREO PERSONAL',       k: 'correoPers', ancho: 32 },
+  { cab: 'N° DE CELULAR',         k: 'celular',    ancho: 15 },
+  { cab: 'SEDE ASIGNADA',         k: '_sede',      ancho: 34 }
+];
+
+const letra = i => String.fromCharCode(65 + i);
+
+// Estilos: 0 normal · 1 cabecera · 2 celda con borde · 3 subtítulo · 4+ títulos por color
+function hojaEstilos(acentos) {
+  const rellenos = acentos.map(hex =>
+    '<fill><patternFill patternType="solid"><fgColor rgb="FF' + hex + '"/><bgColor indexed="64"/></patternFill></fill>'
+  ).join('');
+  const titulos = acentos.map((_, i) =>
+    '<xf numFmtId="0" fontId="1" fillId="' + (3 + i) + '" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+  ).join('');
+
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<fonts count="4">' +
+      '<font><sz val="11"/><name val="Calibri"/></font>' +
+      '<font><b/><sz val="14"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>' +
+      '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>' +
+      '<font><i/><sz val="10"/><color rgb="FF5B6B66"/><name val="Calibri"/></font>' +
+    '</fonts>' +
+    '<fills count="' + (3 + acentos.length) + '">' +
+      '<fill><patternFill patternType="none"/></fill>' +
+      '<fill><patternFill patternType="gray125"/></fill>' +
+      '<fill><patternFill patternType="solid"><fgColor rgb="FF16211E"/><bgColor indexed="64"/></patternFill></fill>' +
+      rellenos +
+    '</fills>' +
+    '<borders count="2">' +
+      '<border><left/><right/><top/><bottom/><diagonal/></border>' +
+      '<border><left style="thin"><color rgb="FFD8DEDB"/></left><right style="thin"><color rgb="FFD8DEDB"/></right><top style="thin"><color rgb="FFD8DEDB"/></top><bottom style="thin"><color rgb="FFD8DEDB"/></bottom><diagonal/></border>' +
+    '</borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+    '<cellXfs count="' + (4 + acentos.length) + '">' +
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+      '<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>' +
+      '<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
+      titulos +
+    '</cellXfs>' +
+    '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+    '</styleSheet>';
+}
+
+function celda(ref, estilo, valor, numerico) {
+  if (valor === '' || valor == null) return '<c r="' + ref + '" s="' + estilo + '"/>';
+  if (numerico) return '<c r="' + ref + '" s="' + estilo + '"><v>' + valor + '</v></c>';
+  return '<c r="' + ref + '" s="' + estilo + '" t="inlineStr"><is><t xml:space="preserve">' + esc(valor) + '</t></is></c>';
+}
+
+function hojaXml(titulo, filas, estiloTitulo, conSede) {
+  const cols = conSede ? COLS : COLS.slice(0, -1);
+  const ultima = letra(cols.length - 1);
+
+  let xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<dimension ref="A1:' + ultima + (3 + Math.max(filas.length, 1)) + '"/>' +
+    '<sheetViews><sheetView workbookViewId="0"><pane ySplit="3" topLeftCell="A4" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' +
+    '<sheetFormatPr defaultRowHeight="15"/>' +
+    '<cols>' +
+    cols.map((c, i) => '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + c.ancho + '" customWidth="1"/>').join('') +
+    '</cols><sheetData>';
+
+  // Fila 1 — título
+  xml += '<row r="1" ht="26" customHeight="1">';
+  cols.forEach((c, i) => {
+    xml += celda(letra(i) + '1', estiloTitulo, i === 0 ? titulo : '', false);
+  });
+  xml += '</row>';
+
+  // Fila 2 — subtítulo
+  xml += '<row r="2" ht="17" customHeight="1">';
+  cols.forEach((c, i) => {
+    xml += celda(letra(i) + '2', 3, i === 0 ? ('Total de estudiantes: ' + filas.length) : '', false);
+  });
+  xml += '</row>';
+
+  // Fila 3 — cabeceras
+  xml += '<row r="3" ht="30" customHeight="1">';
+  cols.forEach((c, i) => { xml += celda(letra(i) + '3', 1, c.cab, false); });
+  xml += '</row>';
+
+  // Datos
+  filas.forEach((f, idx) => {
+    const r = 4 + idx;
+    xml += '<row r="' + r + '">';
+    cols.forEach((c, i) => {
+      const esNum = c.k === '_n' || c.k === 'gpa';
+      let val;
+      if (c.k === '_n') val = idx + 1;
+      else if (c.k === 'gpa') val = (f.gpa != null ? f.gpa : '');
+      else val = (f[c.k] || '');
+      xml += celda(letra(i) + r, 2, val, esNum);
+    });
+    xml += '</row>';
+  });
+
+  xml += '</sheetData>';
+  if (filas.length) {
+    xml += '<autoFilter ref="A3:' + ultima + (3 + filas.length) + '"/>';
+  }
+  xml += '<mergeCells count="2">' +
+    '<mergeCell ref="A1:' + ultima + '1"/>' +
+    '<mergeCell ref="A2:' + ultima + '2"/>' +
+    '</mergeCells>';
+  xml += '</worksheet>';
+  return xml;
+}
+
+function construirLibro(hojas) {
+  // hojas: [{ nombre, titulo, filas, acento, conSede }]
+  const acentos = hojas.map(h => h.acento);
+
+  const partes = [];
+
+  partes.push({
+    nombre: '[Content_Types].xml',
+    bytes: bytes('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      hojas.map((_, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('') +
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+      '</Types>')
+  });
+
+  partes.push({
+    nombre: '_rels/.rels',
+    bytes: bytes('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+      '</Relationships>')
+  });
+
+  partes.push({
+    nombre: 'xl/workbook.xml',
+    bytes: bytes('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+      hojas.map((h, i) => '<sheet name="' + esc(h.nombre) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>').join('') +
+      '</sheets></workbook>')
+  });
+
+  partes.push({
+    nombre: 'xl/_rels/workbook.xml.rels',
+    bytes: bytes('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      hojas.map((_, i) => '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>').join('') +
+      '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+      '</Relationships>')
+  });
+
+  partes.push({ nombre: 'xl/styles.xml', bytes: bytes(hojaEstilos(acentos)) });
+
+  hojas.forEach((h, i) => {
+    partes.push({
+      nombre: 'xl/worksheets/sheet' + (i + 1) + '.xml',
+      bytes: bytes(hojaXml(h.titulo, h.filas, 4 + i, h.conSede))
+    });
+  });
+
+  return armarZip(partes);
+}
+
+/**
+ * Entrega el archivo al usuario.
+ *
+ * El clic programatico funciona en una pestana normal, pero si la pagina esta
+ * embebida en un iframe con sandbox el navegador lo ignora SIN lanzar error y
+ * sin dejar rastro: no hay forma de detectarlo desde JS. Por eso ademas del
+ * intento automatico siempre se deja un enlace real y visible: un clic hecho
+ * por la persona se permite en contextos donde el sintetico no.
+ */
+function descargar(blob, nombre) {
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nombre;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  enlaceDeRespaldo(url, nombre);
+}
+
+function enlaceDeRespaldo(url, nombre) {
+  const caja = document.createElement('div');
+  caja.className = 'notice respaldo';
+
+  const texto = document.createElement('span');
+  texto.textContent = '¿No se descargó?';
+
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = nombre;
+  enlace.target = '_blank';
+  enlace.rel = 'noopener';
+  enlace.className = 'respaldo-link';
+  enlace.textContent = nombre;
+
+  const cerrar = document.createElement('button');
+  cerrar.type = 'button';
+  cerrar.className = 'respaldo-x';
+  cerrar.setAttribute('aria-label', 'Cerrar');
+  cerrar.textContent = '×';
+  cerrar.addEventListener('click', () => {
+    caja.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  caja.append(texto, enlace, cerrar);
+  $('#notices').appendChild(caja);
+
+  // Se mantiene un buen rato: si la descarga automatica fallo, este enlace es
+  // la unica via. No se revoca la URL mientras siga en pantalla.
+  setTimeout(() => {
+    if (caja.isConnected) { caja.remove(); URL.revokeObjectURL(url); }
+  }, 120000);
+}
+
+function filasDe(sedeId) {
+  return estado.orden[sedeId]
+    .map(porId)
+    .filter(Boolean)
+    .slice()
+    // Mismo criterio que la nómina: GPA descendente (prioridad).
+    .sort((a, b) => (b.gpa != null ? b.gpa : -1) - (a.gpa != null ? a.gpa : -1));
+}
+
+const sinAcentos = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+function exportarSede(sede, boton) {
+  const filas = filasDe(sede.id);
+  if (!filas.length) { aviso('Esta sede aún no tiene postulantes', 'bad'); return; }
+  const blob = construirLibro([
+    { nombre: sede.hoja, titulo: sede.nombre.toUpperCase(), filas, acento: sede.xlsx, conSede: false }
+  ]);
+  const slug = sinAcentos(sede.hoja).replace(/[^\w]+/g, '_').replace(/^_|_$/g, '');
+  descargar(blob, 'Plazas_' + slug + '.xlsx');
+  aviso('Excel de ' + sede.nombre + ' descargado', 'ok');
+}
+
+function exportarTodo() {
+  const hojas = SEDES.map(s => ({
+    nombre: s.hoja,
+    titulo: s.nombre.toUpperCase(),
+    filas: filasDe(s.id),
+    acento: s.xlsx,
+    conSede: false
+  }));
+
+  const consolidado = [];
+  SEDES.forEach(s => filasDe(s.id).forEach(e => consolidado.push({ ...e, _sede: s.nombre })));
+  ESTUDIANTES.filter(e => !estado.asignado[e.id])
+    .forEach(e => consolidado.push({ ...e, _sede: 'SIN ASIGNAR' }));
+
+  hojas.push({
+    nombre: 'CONSOLIDADO',
+    titulo: 'CONSOLIDADO GENERAL — 64 POSTULANTES',
+    filas: consolidado,
+    acento: '16211E',
+    conSede: true
+  });
+
+  descargar(construirLibro(hojas), 'Plazas_Consolidado_General.xlsx');
+  aviso('Consolidado descargado (4 hojas)', 'ok');
+}
+
+/* ============================================================
+   EVENTOS
+   ============================================================ */
+$('#buscar').addEventListener('input', ev => {
+  estado.filtro = ev.target.value;
+  pintarNomina();
+});
+
+$('#btn-tema').addEventListener('click', alternarTema);
+$('#btn-reset').addEventListener('click', vaciar);
+$('#btn-todo').addEventListener('click', exportarTodo);
+
+const roster = $('#roster');
+roster.addEventListener('dragover', ev => {
+  if (!estado.arrastrando || !estado.asignado[estado.arrastrando]) return;
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = 'move';
+  roster.classList.add('drop-active');
+});
+roster.addEventListener('dragleave', ev => {
+  if (!roster.contains(ev.relatedTarget)) roster.classList.remove('drop-active');
+});
+roster.addEventListener('drop', ev => {
+  ev.preventDefault();
+  roster.classList.remove('drop-active');
+  const eid = ev.dataTransfer.getData('text/plain') || estado.arrastrando;
+  if (eid && estado.asignado[eid]) liberar(eid);
+});
+
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Escape' && estado.fijado) { estado.fijado = null; pintarNomina(); }
+});
+
+/* ============================================================
+   ACCESO
+   ============================================================ */
+function mostrarAcceso(mensaje) {
+  $('#acceso').style.display = 'flex';
+  $('#acceso-error').textContent = mensaje || '';
+  $('#acceso-error').style.display = mensaje ? 'block' : 'none';
+  $('#acceso-clave').value = '';
+  setTimeout(() => {
+    const c = $('#acceso-correo');
+    (c.value ? $('#acceso-clave') : c).focus();
+  }, 60);
+}
+
+function ocultarAcceso() {
+  $('#acceso').style.display = 'none';
+}
+
+async function arrancar() {
+  if (!MODO_REMOTO) {
+    recuperar();
+    pintar();
+    return;
+  }
+  try {
+    await cargarDesdeTabla();
+    ocultarAcceso();
+    pintar();
+  } catch (err) {
+    if (!/sesión no válida/.test(err.message)) {
+      mostrarAcceso('No se pudo leer la tabla: ' + err.message);
+    }
+  }
+}
+
+if (MODO_REMOTO) {
+  $('#acceso-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const boton = $('#acceso-enviar');
+    boton.disabled = true;
+    boton.textContent = 'Entrando…';
+    try {
+      await autenticar($('#acceso-correo').value.trim(), $('#acceso-clave').value);
+      await arrancar();
+      aviso('Sesión iniciada', 'ok');
+    } catch (err) {
+      mostrarAcceso(err.message);
+    } finally {
+      boton.disabled = false;
+      boton.textContent = 'Entrar';
+    }
+  });
+
+  $('#btn-salir').addEventListener('click', () => {
+    guardarSesion(null);
+    mostrarAcceso('Sesión cerrada.');
+  });
+}
+
+/* ============================================================
+   INICIO
+   ============================================================ */
+if (MODO_REMOTO) {
+  $('#btn-salir').style.display = 'inline-flex';
+  recuperarSesion();
+  if (sesion) arrancar();
+  else mostrarAcceso();
+} else {
+  arrancar();
+}
+</script>
+</body>
+</html>
