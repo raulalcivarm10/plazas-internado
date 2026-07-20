@@ -4,6 +4,11 @@ Asignación drag & drop de postulantes a sedes hospitalarias, con exportación a
 por sede y consolidada. La página es un único HTML autónomo: sin backend, sin build
 de framework, sin dependencias en tiempo de ejecución.
 
+La nómina se ordena por **GPA descendente**: el postulante con mayor promedio elige
+plaza primero (es la prioridad de selección). El GPA se muestra en cada ficha y va
+como columna en los Excel. Incluye **tema claro/oscuro** con botón en la barra, que
+respeta la preferencia del sistema y recuerda la elección.
+
 | Sede | Plazas |
 |---|---|
 | Hospital Enrique Ortega Moreira | 30 |

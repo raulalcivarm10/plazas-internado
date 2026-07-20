@@ -106,8 +106,13 @@ if (!cfg.documento) {
   const cabeza = html.slice(iniCabeza, finCabeza).trim();
   const cuerpo = html.slice(iniCuerpo + '<body>'.length, finCuerpo).trim();
   html = cabeza + '\n\n' + cuerpo + '\n';
-  // Delimitado: sin esto "<head" tambien coincidiria con "<header>"
-  if (/<!DOCTYPE|<\/?(html|head|body)[\s>]/i.test(html)) {
+  // Se chequea sobre una copia SIN comentarios: un comentario que mencione
+  // "<html>" no debe disparar el guard. Delimitado para no confundir <head>
+  // con <header>.
+  const sinComentarios = html
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  if (/<!DOCTYPE|<\/?(html|head|body)[\s>]/i.test(sinComentarios)) {
     console.error('ABORTADO: quedaron etiquetas de documento en el formato artifact.');
     process.exit(1);
   }

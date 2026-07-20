@@ -27,6 +27,7 @@ const filas = estudiantes.map((e) => {
     console.error('Id no numerico en el registro: ' + JSON.stringify(e));
     process.exit(1);
   }
+  const gpa = (e.gpa === null || e.gpa === undefined || e.gpa === '') ? 'null' : Number(e.gpa);
   return '  (' + [
     id,
     lit(e.apellidos),
@@ -35,7 +36,8 @@ const filas = estudiantes.map((e) => {
     lit(e.cedula),
     lit(e.correoInst),
     lit(e.correoPers),
-    lit(e.celular)
+    lit(e.celular),
+    gpa
   ].join(', ') + ')';
 });
 
@@ -48,7 +50,7 @@ const sql = [
   '-- ============================================================',
   '',
   'insert into public.estudiantes',
-  '  (id, apellidos, nombres, codigo, cedula, correo_inst, correo_pers, celular)',
+  '  (id, apellidos, nombres, codigo, cedula, correo_inst, correo_pers, celular, gpa)',
   'values',
   filas.join(',\n'),
   'on conflict (id) do update set',
@@ -58,7 +60,8 @@ const sql = [
   '  cedula      = excluded.cedula,',
   '  correo_inst = excluded.correo_inst,',
   '  correo_pers = excluded.correo_pers,',
-  '  celular     = excluded.celular;',
+  '  celular     = excluded.celular,',
+  '  gpa         = excluded.gpa;',
   '',
   '-- Comprobacion: debe devolver ' + filas.length,
   'select count(*) as total from public.estudiantes;',

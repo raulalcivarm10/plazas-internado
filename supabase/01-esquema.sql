@@ -24,6 +24,7 @@ create table if not exists public.estudiantes (
   correo_inst  text,
   correo_pers  text,
   celular      text,
+  gpa          numeric(6,2),   -- promedio; define el orden de prioridad
   sede_id      text         references public.sedes(id) on delete set null,
   actualizado  timestamptz  not null default now()
 );

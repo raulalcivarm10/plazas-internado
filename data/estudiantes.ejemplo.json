@@ -7,7 +7,8 @@
   "cedula": "0900000001",
   "correoInst": "aperez@uees.edu.ec",
   "correoPers": "ana.ejemplo@gmail.com",
-  "celular": "0990000001"
+  "celular": "0990000001",
+  "gpa": 92.5
  },
  {
   "id": "2",
@@ -17,6 +18,7 @@
   "cedula": "0900000002",
   "correoInst": "ltorres@uees.edu.ec",
   "correoPers": "luis.muestra@gmail.com",
-  "celular": "0990000002"
+  "celular": "0990000002",
+  "gpa": 85.1
  }
 ]

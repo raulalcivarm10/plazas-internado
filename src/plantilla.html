@@ -216,6 +216,20 @@ body {
 }
 .btn-solid:hover { background: var(--ok); border-color: var(--ok); filter: brightness(1.08); }
 
+/* Botón de tema: solo icono. En tema oscuro muestra el sol (para pasar a claro),
+   en tema claro muestra la luna. aplicarTema() fija data-theme en la raíz. */
+.btn-icon { padding: 9px; }
+.btn-icon .ico-sol,
+.btn-icon .ico-luna { display: none; }
+:root[data-theme="dark"]  .btn-icon .ico-sol  { display: block; }
+:root[data-theme="light"] .btn-icon .ico-luna { display: block; }
+/* Fallback antes de que corra el JS: seguir al sistema */
+:root:not([data-theme]) .btn-icon .ico-luna { display: block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .btn-icon .ico-luna { display: none; }
+  :root:not([data-theme]) .btn-icon .ico-sol  { display: block; }
+}
+
 /* ============================================================
    TABLERO
    ============================================================ */
@@ -350,6 +364,14 @@ body {
 
 .rec-main { padding: 9px 12px; min-width: 0; }
 
+.rec-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+.rec-id { min-width: 0; flex: 1; }
+
 .rec-name {
   font-family: var(--serif);
   font-size: 14.5px;
@@ -363,10 +385,39 @@ body {
 .rec-given {
   font-size: 11.5px;
   color: var(--ink-2);
-  margin: 0 0 7px;
+  margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* GPA: el dato que ordena la nómina, destacado en cada ficha */
+.rec-gpa {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--heom) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--heom) 30%, transparent);
+}
+.gpa-num {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--heom);
+  font-variant-numeric: tabular-nums;
+}
+.gpa-lab {
+  font-size: 8.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-top: 2px;
 }
 
 .rec-fields {
@@ -587,6 +638,17 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.slot-gpa {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--wc, var(--heom));
+  font-variant-numeric: tabular-nums;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--wc, var(--heom)) 12%, transparent);
+}
 .slot-pull {
   flex: none;
   width: 20px; height: 20px;
@@ -801,6 +863,10 @@ body {
   </div>
 
   <div class="head-actions">
+    <button class="btn btn-icon" id="btn-tema" type="button" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema">
+      <svg class="ico-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <svg class="ico-luna" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+    </button>
     <button class="btn" id="btn-salir" type="button" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
       Salir
@@ -823,7 +889,7 @@ body {
     <div class="col-head">
       <h2 id="h-nomina">Nómina</h2>
       <span class="count-chip" id="chip-nomina">0</span>
-      <p class="note">Clic para fijar, luego clic en una sede</p>
+      <p class="note">Ordenada por GPA (mayor prioridad primero)</p>
     </div>
 
     <div class="roster" id="roster">
@@ -910,6 +976,48 @@ SEDES.forEach(s => { estado.orden[s.id] = []; });
    UTILIDADES
    ============================================================ */
 const $ = sel => document.querySelector(sel);
+
+/* ------------------------------------------------------------------ tema */
+const LLAVE_TEMA = 'plazas.tema.v1';
+
+function aplicarTema(tema, persistir = true) {
+  // tema: 'claro' | 'oscuro'. Se fija en la raíz para que gane sobre el media query.
+  // Solo se guarda cuando es una elección explícita: si se persistiera el tema
+  // derivado del sistema en la primera visita, la página dejaría de seguir al SO.
+  document.documentElement.setAttribute('data-theme', tema === 'oscuro' ? 'dark' : 'light');
+  if (persistir) {
+    try { localStorage.setItem(LLAVE_TEMA, tema); } catch (_) { /* sin almacenamiento */ }
+  }
+}
+
+function temaInicial() {
+  let guardado;
+  try { guardado = localStorage.getItem(LLAVE_TEMA); } catch (_) { /* */ }
+  if (guardado === 'claro' || guardado === 'oscuro') return guardado;
+  // Sin preferencia: seguir al sistema
+  const oscuroSistema = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return oscuroSistema ? 'oscuro' : 'claro';
+}
+
+function alternarTema() {
+  const actual = document.documentElement.getAttribute('data-theme') === 'dark' ? 'oscuro' : 'claro';
+  aplicarTema(actual === 'oscuro' ? 'claro' : 'oscuro');
+}
+
+// Se aplica de inmediato para evitar parpadeo. Sin persistir: si no hay elección
+// previa, cada visita vuelve a derivar el tema del sistema.
+aplicarTema(temaInicial(), false);
+
+// Mientras no exista elección explícita, seguir en vivo los cambios del sistema.
+if (window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (ev) => {
+    let guardado;
+    try { guardado = localStorage.getItem(LLAVE_TEMA); } catch (_) { /* */ }
+    if (guardado !== 'claro' && guardado !== 'oscuro') {
+      aplicarTema(ev.matches ? 'oscuro' : 'claro', false);
+    }
+  });
+}
 
 const porId = id => ESTUDIANTES.find(e => String(e.id) === String(id));
 const sedePorId = id => SEDES.find(s => s.id === id);
@@ -1041,13 +1149,15 @@ function desdeFila(f) {
     correoInst: f.correo_inst || '',
     correoPers: f.correo_pers || '',
     celular: f.celular || '',
+    gpa: f.gpa != null ? Number(f.gpa) : null,
     sedeId: f.sede_id || null
   };
 }
 
 async function cargarDesdeTabla() {
   const sedes = await api('/rest/v1/sedes?select=id,nombre,plazas,orden&order=orden');
-  const filas = await api('/rest/v1/estudiantes?select=*&order=apellidos');
+  // Orden por GPA descendente: es la prioridad de selección de plaza.
+  const filas = await api('/rest/v1/estudiantes?select=*&order=gpa.desc.nullslast');
 
   // Las plazas mandan desde la tabla; el color y el nombre corto son de la interfaz
   sedes.forEach((s) => {
@@ -1227,7 +1337,10 @@ function fichaNomina(est) {
   const main = document.createElement('div');
   main.className = 'rec-main';
   main.innerHTML =
-    '<h3 class="rec-name"></h3><p class="rec-given"></p>' +
+    '<div class="rec-top">' +
+      '<div class="rec-id"><h3 class="rec-name"></h3><p class="rec-given"></p></div>' +
+      '<div class="rec-gpa"><span class="gpa-num"></span><span class="gpa-lab">GPA</span></div>' +
+    '</div>' +
     '<dl class="rec-fields">' +
       '<div><dt>Código</dt><dd data-k="codigo"></dd></div>' +
       '<div><dt>Cédula</dt><dd data-k="cedula"></dd></div>' +
@@ -1237,6 +1350,7 @@ function fichaNomina(est) {
     '</dl>';
   main.querySelector('.rec-name').textContent = est.apellidos;
   main.querySelector('.rec-given').textContent = est.nombres;
+  main.querySelector('.gpa-num').textContent = est.gpa != null ? Number(est.gpa).toFixed(2) : '—';
   main.querySelectorAll('[data-k]').forEach(dd => {
     const v = est[dd.dataset.k] || '—';
     dd.textContent = v;
@@ -1266,6 +1380,11 @@ function fichaSede(est, indice) {
   sp.textContent = est.nombres;
   nom.append(b, sp);
 
+  const gpa = document.createElement('span');
+  gpa.className = 'slot-gpa';
+  gpa.textContent = est.gpa != null ? Number(est.gpa).toFixed(2) : '—';
+  gpa.title = 'GPA ' + gpa.textContent;
+
   // El botón se construye aquí, no se oculta con CSS: no puede aparecer donde no debe
   const quitar = document.createElement('button');
   quitar.type = 'button';
@@ -1275,7 +1394,7 @@ function fichaSede(est, indice) {
   quitar.textContent = '×';
   quitar.addEventListener('click', ev => { ev.stopPropagation(); liberar(est.id); });
 
-  fila.append(n, nom, quitar);
+  fila.append(n, nom, gpa, quitar);
   hacerArrastrable(fila, est.id);
   return fila;
 }
@@ -1284,7 +1403,7 @@ function pintarNomina() {
   const q = estado.filtro.trim().toLowerCase();
   const libres = ESTUDIANTES.filter(e => !estado.asignado[e.id]);
   const visibles = q
-    ? libres.filter(e => [e.apellidos, e.nombres, e.codigo, e.cedula, e.correoInst, e.correoPers, e.celular]
+    ? libres.filter(e => [e.apellidos, e.nombres, e.codigo, e.cedula, e.correoInst, e.correoPers, e.celular, e.gpa]
         .join(' ').toLowerCase().includes(q))
     : libres;
 
@@ -1543,6 +1662,7 @@ const COLS = [
   { cab: 'N°',                    k: '_n',         ancho: 5 },
   { cab: 'APELLIDOS',             k: 'apellidos',  ancho: 26 },
   { cab: 'NOMBRES',               k: 'nombres',    ancho: 26 },
+  { cab: 'GPA',                   k: 'gpa',        ancho: 9 },
   { cab: 'CÓDIGO',                k: 'codigo',     ancho: 14 },
   { cab: 'N° DE CÉDULA',          k: 'cedula',     ancho: 15 },
   { cab: 'CORREO INSTITUCIONAL',  k: 'correoInst', ancho: 32 },
@@ -1635,8 +1755,11 @@ function hojaXml(titulo, filas, estiloTitulo, conSede) {
     const r = 4 + idx;
     xml += '<row r="' + r + '">';
     cols.forEach((c, i) => {
-      const esNum = c.k === '_n';
-      const val = c.k === '_n' ? (idx + 1) : (f[c.k] || '');
+      const esNum = c.k === '_n' || c.k === 'gpa';
+      let val;
+      if (c.k === '_n') val = idx + 1;
+      else if (c.k === 'gpa') val = (f.gpa != null ? f.gpa : '');
+      else val = (f[c.k] || '');
       xml += celda(letra(i) + r, 2, val, esNum);
     });
     xml += '</row>';
@@ -1773,7 +1896,8 @@ function filasDe(sedeId) {
     .map(porId)
     .filter(Boolean)
     .slice()
-    .sort((a, b) => a.apellidos.localeCompare(b.apellidos, 'es'));
+    // Mismo criterio que la nómina: GPA descendente (prioridad).
+    .sort((a, b) => (b.gpa != null ? b.gpa : -1) - (a.gpa != null ? a.gpa : -1));
 }
 
 const sinAcentos = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -1823,6 +1947,7 @@ $('#buscar').addEventListener('input', ev => {
   pintarNomina();
 });
 
+$('#btn-tema').addEventListener('click', alternarTema);
 $('#btn-reset').addEventListener('click', vaciar);
 $('#btn-todo').addEventListener('click', exportarTodo);
 
