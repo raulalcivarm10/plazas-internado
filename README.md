@@ -46,18 +46,24 @@ desde la tabla tras iniciar sesión. Por eso `node scripts/build.js publico`
 sin querer un HTML con las 64 cédulas dentro.
 
 1. Crea un proyecto en [supabase.com](https://supabase.com) (plan gratuito).
-2. Abre `supabase/01-esquema.sql`, reemplaza `CORREO_AUTORIZADO` por el correo
-   de la única persona que entrará, y ejecútalo en **SQL Editor**.
+   Elige la región más cercana (**South America / São Paulo**) y guarda la
+   contraseña de la base — es distinta de la del acceso a la app.
+2. Abre `supabase/01-esquema.sql`, reemplaza **todas** las apariciones de
+   `CORREO_AUTORIZADO` por el correo de la única persona que entrará (usa
+   Buscar y reemplazar), y ejecútalo en **SQL Editor**.
 3. Genera la carga de datos y ejecútala igual en SQL Editor:
    ```bash
    node scripts/seed.js      # crea supabase/02-datos.sql (con datos reales; no se versiona)
    ```
 4. **Authentication → Users → Add user**: crea ese único usuario con su correo y
-   contraseña. *(La contraseña no se guarda en ningún archivo: la pide la pantalla
-   de acceso en cada sesión.)*
-5. **Authentication → Providers → Email**: **desactiva "Enable Sign Ups"**. Así
-   nadie puede auto-registrarse; solo existirá el usuario que creaste.
-6. **Settings → API**: copia `Project URL` y la clave `anon` en `src/config.json`.
+   contraseña, y **marca "Auto Confirm User"** (si no, el login da "email not
+   confirmed"). *(La contraseña no se guarda en ningún archivo: la pide la
+   pantalla de acceso en cada sesión.)*
+5. **Authentication → Sign In / Providers → Email**: **desactiva "Allow new users
+   to sign up"**. Así nadie puede auto-registrarse; solo existirá el usuario que
+   creaste.
+6. **Settings → API**: copia `Project URL` y la clave `anon public` en
+   `src/config.json` (la `service_role` NO, esa es secreta).
 7. Construye y publica:
    ```bash
    node scripts/build.js publico     # ahora sí: docs/index.html sin datos, con login
