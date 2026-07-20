@@ -48,20 +48,21 @@ sin querer un HTML con las 64 cédulas dentro.
 1. Crea un proyecto en [supabase.com](https://supabase.com) (plan gratuito).
    Elige la región más cercana (**South America / São Paulo**) y guarda la
    contraseña de la base — es distinta de la del acceso a la app.
-2. Abre `supabase/01-esquema.sql`, reemplaza **todas** las apariciones de
-   `CORREO_AUTORIZADO` por el correo de la única persona que entrará (usa
-   Buscar y reemplazar), y ejecútalo en **SQL Editor**.
+2. Abre `supabase/01-esquema.sql`, en el `insert into public.acceso_autorizado`
+   reemplaza `CORREO_AUTORIZADO` por el correo de quien podrá entrar (agrega más
+   líneas si son varias personas), y ejecútalo en **SQL Editor**.
 3. Genera la carga de datos y ejecútala igual en SQL Editor:
    ```bash
    node scripts/seed.js      # crea supabase/02-datos.sql (con datos reales; no se versiona)
    ```
-4. **Authentication → Users → Add user**: crea ese único usuario con su correo y
+4. **Authentication → Users → Add user**: crea a cada persona con su correo y
    contraseña, y **marca "Auto Confirm User"** (si no, el login da "email not
    confirmed"). *(La contraseña no se guarda en ningún archivo: la pide la
-   pantalla de acceso en cada sesión.)*
+   pantalla de acceso en cada sesión.)* El correo debe coincidir con uno de la
+   lista `acceso_autorizado`.
 5. **Authentication → Sign In / Providers → Email**: **desactiva "Allow new users
-   to sign up"**. Así nadie puede auto-registrarse; solo existirá el usuario que
-   creaste.
+   to sign up"**. Así nadie puede auto-registrarse; solo existirán los usuarios
+   que crees.
 6. **Settings → API**: copia `Project URL` y la clave `anon public` en
    `src/config.json` (la `service_role` NO, esa es secreta).
 7. Construye y publica:
@@ -71,16 +72,21 @@ sin querer un HTML con las 64 cédulas dentro.
    ```
    En GitHub: **Settings → Pages → Deploy from a branch**, rama `main`, carpeta `/docs`.
 
-La `anon key` sí puede ser pública: sola no lee nada. Solo el correo autorizado,
-tras iniciar sesión, puede leer y mover plazas.
+La `anon key` sí puede ser pública: sola no lee nada. Solo los correos de la lista
+`acceso_autorizado`, tras iniciar sesión, pueden leer y mover plazas.
 
 ### Quién puede entrar
 
 El acceso está cerrado en **tres capas**, no en una:
 
-1. La policy RLS solo deja leer/escribir al correo autorizado (`CORREO_AUTORIZADO`).
+1. La policy RLS (vía `es_autorizado()`) solo deja leer/escribir a los correos de
+   la tabla `acceso_autorizado`. Todos con acceso idéntico.
 2. Los registros públicos desactivados: nadie más puede crearse una cuenta.
-3. Existe un solo usuario en Authentication.
+3. Solo existen en Authentication los usuarios que creaste.
+
+**Agregar o quitar una persona:** en **Table Editor → `acceso_autorizado`**,
+inserta una fila con su correo (y créale usuario en Authentication) o bórrala para
+revocar. No hace falta tocar código ni políticas.
 
 ### Cómo queda repartido
 

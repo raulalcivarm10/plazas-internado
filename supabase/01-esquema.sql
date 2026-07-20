@@ -88,15 +88,44 @@ create trigger trg_verificar_cupo
 --  Seguridad
 --
 --  La anon key viaja en el código de la página, así que sin RLS
---  cualquiera leería las cédulas. Además, si en Supabase quedan
---  activos los registros públicos, un desconocido podría auto-
---  registrarse y volverse "authenticated". Por eso el acceso NO
---  se abre a cualquier autenticado, sino SOLO a un correo.
+--  cualquiera leería las cédulas. El acceso NO se abre a cualquier
+--  autenticado, sino solo a los correos de una lista blanca.
 --
---  >>> ANTES DE EJECUTAR: reemplaza CORREO_AUTORIZADO por el
---      correo de la única persona que podrá entrar. <<<
---      (El correo queda en tu base, no en el repositorio.)
+--  >>> Añade abajo (insert) los correos de quienes podrán entrar. <<<
+--      (Los correos quedan en tu base, no en el repositorio.)
+--      Para autorizar a alguien más luego:
+--        insert into public.acceso_autorizado (email) values ('otro@correo');
+--      Para revocar:
+--        delete from public.acceso_autorizado where email = 'otro@correo';
 -- ------------------------------------------------------------
+
+-- Lista blanca de correos autorizados.
+create table if not exists public.acceso_autorizado (
+  email text primary key
+);
+
+insert into public.acceso_autorizado (email) values
+  ('CORREO_AUTORIZADO')       -- reemplaza / agrega tantos como necesites
+on conflict (email) do nothing;
+
+-- La lista no se expone por la API: RLS activo y sin políticas de lectura.
+alter table public.acceso_autorizado enable row level security;
+
+-- Decide si quien entra está en la lista. security definer: consulta la lista
+-- aunque el llamante no pueda leerla; search_path fijo por seguridad.
+create or replace function public.es_autorizado()
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.acceso_autorizado
+    where email = (auth.jwt() ->> 'email')
+  );
+$$;
+
 alter table public.estudiantes enable row level security;
 alter table public.sedes       enable row level security;
 
@@ -105,13 +134,12 @@ drop policy if exists "estudiantes_actualizar"  on public.estudiantes;
 drop policy if exists "sedes_lectura"           on public.sedes;
 
 create policy "estudiantes_lectura" on public.estudiantes
-  for select to authenticated
-  using ((auth.jwt() ->> 'email') = 'CORREO_AUTORIZADO');
+  for select to authenticated using (public.es_autorizado());
 
 create policy "estudiantes_actualizar" on public.estudiantes
   for update to authenticated
-  using ((auth.jwt() ->> 'email') = 'CORREO_AUTORIZADO')
-  with check ((auth.jwt() ->> 'email') = 'CORREO_AUTORIZADO');
+  using (public.es_autorizado())
+  with check (public.es_autorizado());
 
 -- La app solo cambia la sede. RLS no puede filtrar por columna, así que se
 -- limita el UPDATE a sede_id con privilegios de columna: un intento de tocar
@@ -122,5 +150,4 @@ revoke update on public.estudiantes from authenticated;
 grant  update (sede_id) on public.estudiantes to authenticated;
 
 create policy "sedes_lectura" on public.sedes
-  for select to authenticated
-  using ((auth.jwt() ->> 'email') = 'CORREO_AUTORIZADO');
+  for select to authenticated using (public.es_autorizado());
