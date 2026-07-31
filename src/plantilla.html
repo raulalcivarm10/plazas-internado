@@ -1241,6 +1241,10 @@ function guardarSesion(s) {
     estado.asignado = {};
     estado.fijado = null;
     SEDES.forEach((x) => { estado.orden[x.id] = []; });
+    // También los filtros: si no, un facet de categoría sensible (discapacidad,
+    // embarazo…) quedaría en el panel para la siguiente persona, y filtraría su
+    // nómina en silencio al reingresar.
+    reiniciarFiltros();
     pintar();
   }
 }
@@ -1329,6 +1333,11 @@ async function cargarDesdeTabla() {
   });
 
   ESTUDIANTES = filas.map(desdeFila);
+
+  // Al cambiar de dataset se reinician los filtros: si no, un filtro de la sesión
+  // anterior seguiría vivo sobre la nómina nueva (otra coordinadora), filtrando en
+  // silencio, y el tipo de un campo podría cambiar (chips↔rango) sin coincidir.
+  reiniciarFiltros();
 
   estado.asignado = {};
   SEDES.forEach((s) => { estado.orden[s.id] = []; });
@@ -1551,6 +1560,17 @@ function limpiarFiltros() {
   pintarNomina();
 }
 
+// Reinicio total: al cambiar de dataset o cerrar sesión. Borra criterios,
+// búsqueda y cierra el panel, y refresca la UI para no dejar nada heredado.
+function reiniciarFiltros() {
+  estado.filtros = {};
+  estado.filtro = '';
+  estado.panelAbierto = false;
+  const b = $('#buscar');
+  if (b) b.value = '';
+  renderPanelFiltros();
+}
+
 // Actualiza solo el contador del botón, sin reconstruir el panel (para no
 // perder el foco mientras se escribe en un input de rango).
 function actualizarBadge() {
@@ -1630,7 +1650,10 @@ function renderPanelFiltros() {
           cur.tipo = 'facet';
           if (cur.sel.has(v)) cur.sel.delete(v); else cur.sel.add(v);
           estado.filtros[c.k] = cur;
-          renderPanelFiltros();
+          // Actualizar solo este chip: reconstruir el panel perdería el scroll y
+          // el foco (igual que en los inputs de rango).
+          chip.classList.toggle('on', cur.sel.has(v));
+          actualizarBadge();
           pintarNomina();
         });
         chips.appendChild(chip);
