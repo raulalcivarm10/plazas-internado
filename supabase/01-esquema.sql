@@ -25,9 +25,25 @@ create table if not exists public.estudiantes (
   correo_pers  text,
   celular      text,
   gpa          numeric(6,2),   -- promedio; define el orden de prioridad
+  creditos     numeric(8,2),
+  examen       numeric(6,2),   -- examen de ciencias clínicas
+  pensum       text,           -- pensum / malla
+  discapacidad text,
+  embarazada   text,
+  hijos        integer,
+  estado_civil text,
   sede_id      text         references public.sedes(id) on delete set null,
   actualizado  timestamptz  not null default now()
 );
+
+-- Si la tabla ya existía (versión anterior), agrega las columnas nuevas.
+alter table public.estudiantes add column if not exists creditos     numeric(8,2);
+alter table public.estudiantes add column if not exists examen       numeric(6,2);
+alter table public.estudiantes add column if not exists pensum       text;
+alter table public.estudiantes add column if not exists discapacidad text;
+alter table public.estudiantes add column if not exists embarazada   text;
+alter table public.estudiantes add column if not exists hijos        integer;
+alter table public.estudiantes add column if not exists estado_civil text;
 
 insert into public.sedes (id, nombre, plazas, orden) values
   ('heom', 'Hospital Enrique Ortega Moreira', 30, 1),

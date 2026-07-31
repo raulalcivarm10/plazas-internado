@@ -9,6 +9,13 @@ plaza primero (es la prioridad de selección). El GPA se muestra en cada ficha y
 como columna en los Excel. Incluye **tema claro/oscuro** con botón en la barra, que
 respeta la preferencia del sistema y recuerda la elección.
 
+**Filtro avanzado (descalificar por criterios).** Además de la búsqueda por texto, el
+botón *Filtros* abre un panel para descalificar candidatos por GPA, créditos, examen
+de ciencias clínicas, pensum/malla, estado civil, hijos, discapacidad y embarazo. Se
+combinan (todos deben cumplirse) y el tipo de control se detecta solo según los datos:
+rango numérico para GPA/créditos/examen, chips de categoría para el resto. Los campos
+aparecen a medida que se llenan en el Excel — no hay que tocar código.
+
 | Sede | Plazas |
 |---|---|
 | Hospital Enrique Ortega Moreira | 30 |

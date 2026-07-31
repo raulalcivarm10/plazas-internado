@@ -27,7 +27,9 @@ const filas = estudiantes.map((e) => {
     console.error('Id no numerico en el registro: ' + JSON.stringify(e));
     process.exit(1);
   }
-  const gpa = (e.gpa === null || e.gpa === undefined || e.gpa === '') ? 'null' : Number(e.gpa);
+  // Numéricos: número si tiene valor, si no null (sin comillas).
+  const numLit = (v) => (v === null || v === undefined || String(v).trim() === '' || isNaN(Number(v))) ? 'null' : Number(v);
+  const intLit = (v) => (v === null || v === undefined || String(v).trim() === '' || isNaN(parseInt(v, 10))) ? 'null' : parseInt(v, 10);
   return '  (' + [
     id,
     lit(e.apellidos),
@@ -37,7 +39,14 @@ const filas = estudiantes.map((e) => {
     lit(e.correoInst),
     lit(e.correoPers),
     lit(e.celular),
-    gpa
+    numLit(e.gpa),
+    numLit(e.creditos),
+    numLit(e.examen),
+    lit(e.pensum),
+    lit(e.discapacidad),
+    lit(e.embarazada),
+    intLit(e.hijos),
+    lit(e.estadoCivil)
   ].join(', ') + ')';
 });
 
@@ -50,18 +59,26 @@ const sql = [
   '-- ============================================================',
   '',
   'insert into public.estudiantes',
-  '  (id, apellidos, nombres, codigo, cedula, correo_inst, correo_pers, celular, gpa)',
+  '  (id, apellidos, nombres, codigo, cedula, correo_inst, correo_pers, celular, gpa,',
+  '   creditos, examen, pensum, discapacidad, embarazada, hijos, estado_civil)',
   'values',
   filas.join(',\n'),
   'on conflict (id) do update set',
-  '  apellidos   = excluded.apellidos,',
-  '  nombres     = excluded.nombres,',
-  '  codigo      = excluded.codigo,',
-  '  cedula      = excluded.cedula,',
-  '  correo_inst = excluded.correo_inst,',
-  '  correo_pers = excluded.correo_pers,',
-  '  celular     = excluded.celular,',
-  '  gpa         = excluded.gpa;',
+  '  apellidos    = excluded.apellidos,',
+  '  nombres      = excluded.nombres,',
+  '  codigo       = excluded.codigo,',
+  '  cedula       = excluded.cedula,',
+  '  correo_inst  = excluded.correo_inst,',
+  '  correo_pers  = excluded.correo_pers,',
+  '  celular      = excluded.celular,',
+  '  gpa          = excluded.gpa,',
+  '  creditos     = excluded.creditos,',
+  '  examen       = excluded.examen,',
+  '  pensum       = excluded.pensum,',
+  '  discapacidad = excluded.discapacidad,',
+  '  embarazada   = excluded.embarazada,',
+  '  hijos        = excluded.hijos,',
+  '  estado_civil = excluded.estado_civil;',
   '',
   '-- Comprobacion: debe devolver ' + filas.length,
   'select count(*) as total from public.estudiantes;',

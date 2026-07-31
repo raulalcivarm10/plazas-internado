@@ -6,9 +6,16 @@
   "codigo": "2020100001",
   "cedula": "0900000001",
   "correoInst": "aperez@uees.edu.ec",
-  "correoPers": "ana.ejemplo@gmail.com",
+  "correoPers": "ana@gmail.com",
   "celular": "0990000001",
-  "gpa": 92.5
+  "gpa": 92.5,
+  "creditos": 230,
+  "examen": 85,
+  "pensum": "2018",
+  "discapacidad": "NO",
+  "embarazada": "NO",
+  "hijos": 0,
+  "estadoCivil": "SOLTERO"
  },
  {
   "id": "2",
@@ -17,8 +24,15 @@
   "codigo": "2020100002",
   "cedula": "0900000002",
   "correoInst": "ltorres@uees.edu.ec",
-  "correoPers": "luis.muestra@gmail.com",
+  "correoPers": "luis@gmail.com",
   "celular": "0990000002",
-  "gpa": 85.1
+  "gpa": 85.1,
+  "creditos": 210,
+  "examen": 70,
+  "pensum": "2020",
+  "discapacidad": "NO",
+  "embarazada": "NO",
+  "hijos": 1,
+  "estadoCivil": "CASADO"
  }
 ]
