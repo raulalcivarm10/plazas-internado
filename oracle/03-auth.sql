@@ -35,31 +35,41 @@ END int_auth;
 
 CREATE OR REPLACE PACKAGE BODY int_auth AS
 
+  -- STANDARD_HASH solo existe en SQL (no en expresiones PL/SQL): por eso se
+  -- invoca via SELECT ... FROM dual y el resultado se guarda en variable.
   FUNCTION hash_clave(p_sal RAW, p_clave VARCHAR2) RETURN RAW IS
+    v_hash RAW(32);
   BEGIN
-    -- Concatenacion RAW explicita: evita conversiones implicitas a texto.
-    RETURN STANDARD_HASH(UTL_RAW.CONCAT(p_sal, UTL_RAW.CAST_TO_RAW(p_clave)), 'SHA256');
+    SELECT STANDARD_HASH(UTL_RAW.CONCAT(p_sal, UTL_RAW.CAST_TO_RAW(p_clave)), 'SHA256')
+      INTO v_hash
+      FROM dual;
+    RETURN v_hash;
   END hash_clave;
 
   PROCEDURE crear_usuario(p_email VARCHAR2, p_clave VARCHAR2) IS
     v_sal   RAW(16) := SYS_GUID();
     v_email VARCHAR2(200) := LOWER(TRIM(p_email));
+    v_hash  RAW(32);
   BEGIN
     IF v_email IS NULL OR p_clave IS NULL OR LENGTH(p_clave) < 6 THEN
       RAISE_APPLICATION_ERROR(-20400, 'Email vacio o contrasena de menos de 6 caracteres');
     END IF;
+    -- El hash se calcula ANTES: una funcion privada del body no puede
+    -- llamarse dentro de una sentencia SQL como el MERGE.
+    v_hash := hash_clave(v_sal, p_clave);
     MERGE INTO int_usuarios u
     USING (SELECT v_email AS email FROM dual) s
     ON (u.email = s.email)
-    WHEN MATCHED THEN UPDATE SET u.sal = v_sal, u.clave_hash = hash_clave(v_sal, p_clave)
+    WHEN MATCHED THEN UPDATE SET u.sal = v_sal, u.clave_hash = v_hash
     WHEN NOT MATCHED THEN INSERT (email, sal, clave_hash)
-      VALUES (s.email, v_sal, hash_clave(v_sal, p_clave));
+      VALUES (s.email, v_sal, v_hash);
     COMMIT;
   END crear_usuario;
 
   FUNCTION login(p_email VARCHAR2, p_clave VARCHAR2) RETURN VARCHAR2 IS
     v_u     int_usuarios%ROWTYPE;
     v_token VARCHAR2(64);
+    v_raw   RAW(32);
   BEGIN
     BEGIN
       SELECT * INTO v_u FROM int_usuarios WHERE email = LOWER(TRIM(p_email));
@@ -76,12 +86,15 @@ CREATE OR REPLACE PACKAGE BODY int_auth AS
     DELETE FROM int_sesiones WHERE vence < SYSTIMESTAMP;
 
     -- Token impredecible: incluye material secreto (hash) ademas del GUID.
-    v_token := RAWTOHEX(STANDARD_HASH(
-      UTL_RAW.CONCAT(
-        SYS_GUID(),
-        v_u.clave_hash,
-        UTL_RAW.CAST_TO_RAW(TO_CHAR(SYSTIMESTAMP, 'YYYYMMDDHH24MISSFF6'))
-      ), 'SHA256'));
+    SELECT STANDARD_HASH(
+             UTL_RAW.CONCAT(
+               SYS_GUID(),
+               v_u.clave_hash,
+               UTL_RAW.CAST_TO_RAW(TO_CHAR(SYSTIMESTAMP, 'YYYYMMDDHH24MISSFF6'))
+             ), 'SHA256')
+      INTO v_raw
+      FROM dual;
+    v_token := RAWTOHEX(v_raw);
 
     INSERT INTO int_sesiones (token, email, vence)
     VALUES (v_token, v_u.email, SYSTIMESTAMP + INTERVAL '12' HOUR);
