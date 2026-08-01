@@ -4,10 +4,13 @@ Asignación drag & drop de postulantes a sedes hospitalarias, con exportación a
 por sede y consolidada. La página es un único HTML autónomo: sin backend, sin build
 de framework, sin dependencias en tiempo de ejecución.
 
-La nómina se ordena por **GPA descendente**: el postulante con mayor promedio elige
-plaza primero (es la prioridad de selección). El GPA se muestra en cada ficha y va
-como columna en los Excel. Incluye **tema claro/oscuro** con botón en la barra, que
-respeta la preferencia del sistema y recuerda la elección.
+La nómina se ordena por **prioridad (Art. 11)** y, dentro de cada prioridad, por
+**GPA**. Las prioridades se calculan solas: **P1** top 10% por GPA (mérito),
+**P2** discapacidad/enfermedad, **P3** embarazo, **P4** hijos menores de 5, **P5**
+soltero(a); el resto sin prioridad. Cada estudiante toma la mejor prioridad que le
+aplique. La prioridad se ve en cada ficha (rail de color) y va como columna en los
+Excel. Incluye **tema claro/oscuro** con botón en la barra, que respeta la
+preferencia del sistema y recuerda la elección.
 
 **Filtro avanzado (descalificar por criterios).** Además de la búsqueda por texto, el
 botón *Filtros* abre un panel para descalificar candidatos por GPA, créditos, examen

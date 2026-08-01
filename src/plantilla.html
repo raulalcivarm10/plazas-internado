@@ -485,15 +485,27 @@ body {
   align-items: center;
   justify-content: center;
   font-family: var(--mono);
-  font-size: 9.5px;
-  font-weight: 600;
-  color: var(--surface);
-  writing-mode: vertical-rl;
-  letter-spacing: .06em;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: .02em;
   transition: background .13s;
 }
 
 .rec-main { padding: 9px 12px; min-width: 0; }
+
+/* Etiqueta de prioridad bajo el nombre */
+.rec-prio {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  border: 1px solid;
+  border-radius: 999px;
+  background: var(--surface);
+}
 
 .rec-top {
   display: flex;
@@ -1020,7 +1032,7 @@ body {
     <div class="col-head">
       <h2 id="h-nomina">Nómina</h2>
       <span class="count-chip" id="chip-nomina">0</span>
-      <p class="note">Ordenada por GPA (mayor prioridad primero)</p>
+      <p class="note">Ordenada por prioridad (Art. 11), luego por GPA</p>
     </div>
 
     <div class="roster" id="roster">
@@ -1104,6 +1116,7 @@ const LLAVE = 'plazas.tablero.v2';
 // chips de categoría) NO se fija aquí: se detecta solo según los datos, así el
 // filtro se adapta a lo que se llene en el Excel sin tocar código.
 const CAMPOS_FILTRO = [
+  { k: 'prioridad',   label: 'Prioridad' },
   { k: 'gpa',         label: 'GPA' },
   { k: 'creditos',    label: 'Créditos' },
   { k: 'examen',      label: 'Examen Cs. Clínicas' },
@@ -1113,6 +1126,41 @@ const CAMPOS_FILTRO = [
   { k: 'discapacidad',label: 'Discapacidad' },
   { k: 'embarazada',  label: 'Embarazadas' }
 ];
+
+// Prioridades del Art. 11 (orden de selección de plazas). Un estudiante toma la
+// MEJOR (número menor) que le aplique. La P1 se calcula del GPA (top 10%).
+const PORC_PRIORIDAD1 = 0.10;
+const PRIORIDADES = {
+  1: { et: 'P1 · Mérito académico',      color: '#2E6E5E' },
+  2: { et: 'P2 · Discapacidad/enfermedad', color: '#33578F' },
+  3: { et: 'P3 · Embarazo',              color: '#A85434' },
+  4: { et: 'P4 · Hijos menores de 5',    color: '#7C5CBF' },
+  5: { et: 'P5 · Soltero(a)',            color: '#5B6B66' },
+  6: { et: 'Sin prioridad',              color: '#94A3B8' }
+};
+
+const esSi = v => String(v == null ? '' : v).trim().toUpperCase() === 'SI';
+
+// Asigna e.prioridad (1..6) a cada estudiante. El top 10% por GPA es P1.
+function recomputarPrioridades() {
+  const conGpa = ESTUDIANTES.filter(e => e.gpa != null).slice().sort((a, b) => b.gpa - a.gpa);
+  const nTop = Math.max(1, Math.round(conGpa.length * PORC_PRIORIDAD1));
+  const top = new Set(conGpa.slice(0, nTop).map(e => String(e.id)));
+  ESTUDIANTES.forEach(e => {
+    if (top.has(String(e.id))) e.prioridad = 1;
+    else if (esSi(e.discapacidad)) e.prioridad = 2;
+    else if (esSi(e.embarazada)) e.prioridad = 3;
+    else if (Number(e.hijos) >= 1) e.prioridad = 4;
+    else if (String(e.estadoCivil || '').trim().toUpperCase().startsWith('SOLTER')) e.prioridad = 5;
+    else e.prioridad = 6;
+  });
+}
+
+// Orden de selección: por prioridad (1→6) y dentro de cada una por GPA desc.
+function ordenarPorPrioridad(lista) {
+  return lista.slice().sort((a, b) =>
+    (a.prioridad - b.prioridad) || ((b.gpa != null ? b.gpa : -1) - (a.gpa != null ? a.gpa : -1)));
+}
 
 const estado = {
   asignado: {},   // { idEstudiante: idSede }
@@ -1696,9 +1744,14 @@ function fichaNomina(est) {
   art.className = 'rec';
   if (String(estado.fijado) === String(est.id)) art.classList.add('picked');
 
+  // Rail coloreado por prioridad (Art. 11): el color agrupa la nómina de un vistazo.
+  const prio = est.prioridad || 6;
+  const infoP = PRIORIDADES[prio];
   const rail = document.createElement('div');
   rail.className = 'rec-rail';
-  rail.textContent = est.id;
+  rail.style.background = infoP.color;
+  rail.textContent = prio <= 5 ? ('P' + prio) : '—';
+  rail.title = infoP.et;
 
   const main = document.createElement('div');
   main.className = 'rec-main';
@@ -1707,6 +1760,7 @@ function fichaNomina(est) {
       '<div class="rec-id"><h3 class="rec-name"></h3><p class="rec-given"></p></div>' +
       '<div class="rec-gpa"><span class="gpa-num"></span><span class="gpa-lab">GPA</span></div>' +
     '</div>' +
+    '<div class="rec-prio"></div>' +
     '<dl class="rec-fields">' +
       '<div><dt>Código</dt><dd data-k="codigo"></dd></div>' +
       '<div><dt>Cédula</dt><dd data-k="cedula"></dd></div>' +
@@ -1717,6 +1771,10 @@ function fichaNomina(est) {
   main.querySelector('.rec-name').textContent = est.apellidos;
   main.querySelector('.rec-given').textContent = est.nombres;
   main.querySelector('.gpa-num').textContent = est.gpa != null ? Number(est.gpa).toFixed(2) : '—';
+  const prioTag = main.querySelector('.rec-prio');
+  prioTag.textContent = infoP.et;
+  prioTag.style.color = infoP.color;
+  prioTag.style.borderColor = infoP.color;
   main.querySelectorAll('[data-k]').forEach(dd => {
     const v = est[dd.dataset.k] || '—';
     dd.textContent = v;
@@ -1793,7 +1851,8 @@ function pintarNomina() {
   const libres = ESTUDIANTES.filter(e => !estado.asignado[e.id]);
 
   // Se combinan búsqueda de texto Y filtros de criterios (todos deben cumplirse).
-  const visibles = libres.filter(e => {
+  // El orden es por prioridad (Art. 11) y dentro de cada una por GPA.
+  const visibles = ordenarPorPrioridad(libres).filter(e => {
     if (!cumpleFiltros(e)) return false;
     if (!q) return true;
     return [e.apellidos, e.nombres, e.codigo, e.cedula, e.correoInst, e.correoPers,
@@ -1945,7 +2004,7 @@ function pintarResumen() {
   $('#chip-sedes').textContent = (plazas - asignados) + ' / ' + plazas + ' plazas';
 }
 
-function pintar() { pintarNomina(); pintarSedes(); pintarResumen(); }
+function pintar() { recomputarPrioridades(); pintarNomina(); pintarSedes(); pintarResumen(); }
 
 /* ============================================================
    GENERACIÓN DE XLSX (sin librerías externas)
@@ -2055,17 +2114,27 @@ function esc(valor) {
 const bytes = txt => new TextEncoder().encode(txt);
 
 const COLS = [
-  { cab: 'N°',                    k: '_n',         ancho: 5 },
-  { cab: 'APELLIDOS',             k: 'apellidos',  ancho: 26 },
-  { cab: 'NOMBRES',               k: 'nombres',    ancho: 26 },
-  { cab: 'GPA',                   k: 'gpa',        ancho: 9 },
-  { cab: 'CÓDIGO',                k: 'codigo',     ancho: 14 },
-  { cab: 'N° DE CÉDULA',          k: 'cedula',     ancho: 15 },
-  { cab: 'CORREO INSTITUCIONAL',  k: 'correoInst', ancho: 32 },
-  { cab: 'CORREO PERSONAL',       k: 'correoPers', ancho: 32 },
-  { cab: 'N° DE CELULAR',         k: 'celular',    ancho: 15 },
-  { cab: 'SEDE ASIGNADA',         k: '_sede',      ancho: 34 }
+  { cab: 'N°',                    k: '_n',           ancho: 5 },
+  { cab: 'PRIORIDAD',             k: 'prioridad',    ancho: 10 },
+  { cab: 'APELLIDOS',             k: 'apellidos',    ancho: 26 },
+  { cab: 'NOMBRES',               k: 'nombres',      ancho: 26 },
+  { cab: 'GPA',                   k: 'gpa',          ancho: 9 },
+  { cab: 'CÓDIGO',                k: 'codigo',       ancho: 14 },
+  { cab: 'N° DE CÉDULA',          k: 'cedula',       ancho: 15 },
+  { cab: 'CORREO INSTITUCIONAL',  k: 'correoInst',   ancho: 32 },
+  { cab: 'CORREO PERSONAL',       k: 'correoPers',   ancho: 32 },
+  { cab: 'N° DE CELULAR',         k: 'celular',      ancho: 15 },
+  { cab: 'CRÉDITOS',              k: 'creditos',     ancho: 10 },
+  { cab: 'EXAMEN CS. CLÍNICAS',   k: 'examen',       ancho: 14 },
+  { cab: 'PENSUM',                k: 'pensum',       ancho: 10 },
+  { cab: 'ESTADO CIVIL',          k: 'estadoCivil',  ancho: 14 },
+  { cab: 'HIJOS',                 k: 'hijos',        ancho: 8 },
+  { cab: 'DISCAPACIDAD',          k: 'discapacidad', ancho: 13 },
+  { cab: 'EMBARAZADA',            k: 'embarazada',   ancho: 12 },
+  { cab: 'SEDE ASIGNADA',         k: '_sede',        ancho: 34 }
 ];
+
+const COLS_NUMERICAS = new Set(['prioridad', 'gpa', 'creditos', 'examen', 'hijos']);
 
 const letra = i => String.fromCharCode(65 + i);
 
@@ -2151,12 +2220,12 @@ function hojaXml(titulo, filas, estiloTitulo, conSede) {
     const r = 4 + idx;
     xml += '<row r="' + r + '">';
     cols.forEach((c, i) => {
-      const esNum = c.k === '_n' || c.k === 'gpa';
+      const esNum = c.k === '_n' || COLS_NUMERICAS.has(c.k);
       let val;
       if (c.k === '_n') val = idx + 1;
-      else if (c.k === 'gpa') val = (f.gpa != null ? f.gpa : '');
+      else if (esNum) val = (f[c.k] != null && f[c.k] !== '' ? f[c.k] : '');
       else val = (f[c.k] || '');
-      xml += celda(letra(i) + r, 2, val, esNum);
+      xml += celda(letra(i) + r, 2, val, esNum && val !== '');
     });
     xml += '</row>';
   });
@@ -2288,12 +2357,8 @@ function enlaceDeRespaldo(url, nombre) {
 }
 
 function filasDe(sedeId) {
-  return estado.orden[sedeId]
-    .map(porId)
-    .filter(Boolean)
-    .slice()
-    // Mismo criterio que la nómina: GPA descendente (prioridad).
-    .sort((a, b) => (b.gpa != null ? b.gpa : -1) - (a.gpa != null ? a.gpa : -1));
+  // Mismo criterio que la nómina: por prioridad y dentro de cada una por GPA.
+  return ordenarPorPrioridad(estado.orden[sedeId].map(porId).filter(Boolean));
 }
 
 const sinAcentos = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -2320,7 +2385,8 @@ function exportarTodo() {
 
   const consolidado = [];
   SEDES.forEach(s => filasDe(s.id).forEach(e => consolidado.push({ ...e, _sede: s.nombre })));
-  ESTUDIANTES.filter(e => !estado.asignado[e.id])
+  // Los no asignados también por prioridad, para que el consolidado sea coherente.
+  ordenarPorPrioridad(ESTUDIANTES.filter(e => !estado.asignado[e.id]))
     .forEach(e => consolidado.push({ ...e, _sede: 'SIN ASIGNAR' }));
 
   hojas.push({
