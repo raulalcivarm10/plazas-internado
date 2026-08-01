@@ -1139,7 +1139,11 @@ const PRIORIDADES = {
   6: { et: 'Sin prioridad',              color: '#94A3B8' }
 };
 
-const esSi = v => String(v == null ? '' : v).trim().toUpperCase() === 'SI';
+// Acepta las grafías del afirmativo: SI, si, Sí, SÍ, sí (con o sin tilde).
+// Sin quitar acentos, 'SÍ' !== 'SI' y se perdería la prioridad P2/P3.
+const esSi = v => String(v == null ? '' : v)
+  .normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .trim().toUpperCase() === 'SI';
 
 // Asigna e.prioridad (1..6) a cada estudiante. El top 10% por GPA es P1.
 function recomputarPrioridades() {
