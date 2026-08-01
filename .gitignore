@@ -11,6 +11,7 @@ data/estudiantes.json
 
 # SQL de carga: lleva las 64 cedulas y celulares reales
 supabase/02-datos.sql
+oracle/02-datos-oracle.sql
 
 # Build interno: datos completos
 dist/
