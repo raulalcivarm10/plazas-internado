@@ -1100,7 +1100,10 @@ body {
  * y las asignaciones guardadas en el navegador.
  */
 const SUPABASE = /*__CONFIG__*/{ url: '', anonKey: '' };
-const MODO_REMOTO = Boolean(SUPABASE.url && SUPABASE.anonKey);
+// Backend: 'ords' (Oracle REST) o Supabase (si hay anonKey). La app es la misma;
+// solo cambia el dialecto de la capa remota.
+const ES_ORDS = SUPABASE.tipo === 'ords';
+const MODO_REMOTO = Boolean(SUPABASE.url && (SUPABASE.anonKey || ES_ORDS));
 
 let ESTUDIANTES = /*__DATA__*/[];
 
@@ -1311,13 +1314,15 @@ function recuperarSesion() {
 
 async function api(ruta, opciones) {
   const cfg = opciones || {};
+  const base = ES_ORDS
+    ? { 'Content-Type': 'application/json',
+        ...(sesion ? { 'X-Token': sesion.access_token } : {}) }
+    : { apikey: SUPABASE.anonKey,
+        Authorization: 'Bearer ' + (sesion ? sesion.access_token : SUPABASE.anonKey),
+        'Content-Type': 'application/json' };
   const res = await fetch(SUPABASE.url + ruta, {
     method: cfg.method || 'GET',
-    headers: Object.assign({
-      apikey: SUPABASE.anonKey,
-      Authorization: 'Bearer ' + (sesion ? sesion.access_token : SUPABASE.anonKey),
-      'Content-Type': 'application/json'
-    }, cfg.headers || {}),
+    headers: Object.assign(base, cfg.headers || {}),
     body: cfg.body
   });
 
@@ -1335,6 +1340,25 @@ async function api(ruta, opciones) {
 }
 
 async function autenticar(correo, clave) {
+  if (ES_ORDS) {
+    const res = await fetch(SUPABASE.url + '/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: correo, clave: clave })
+    });
+    const datos = await res.json().catch(() => ({}));
+    if (!res.ok || !datos.token) {
+      throw new Error(datos.error || 'Correo o contraseña incorrectos');
+    }
+    // El token ORDS dura 12 h; se guarda con un margen para renovar antes.
+    guardarSesion({
+      access_token: datos.token,
+      email: datos.email,
+      expires_at: Math.floor(Date.now() / 1000) + 11 * 3600
+    });
+    return;
+  }
+
   const res = await fetch(SUPABASE.url + '/auth/v1/token?grant_type=password', {
     method: 'POST',
     headers: { apikey: SUPABASE.anonKey, 'Content-Type': 'application/json' },
@@ -1371,9 +1395,17 @@ function desdeFila(f) {
 }
 
 async function cargarDesdeTabla() {
-  const sedes = await api('/rest/v1/sedes?select=id,nombre,plazas,orden&order=orden');
-  // Orden por GPA descendente: es la prioridad de selección de plaza.
-  const filas = await api('/rest/v1/estudiantes?select=*&order=gpa.desc.nullslast');
+  let sedes, filas;
+  if (ES_ORDS) {
+    // /yo primero: un token vencido hace que las lecturas vengan vacías (como
+    // hacía RLS); este endpoint devuelve 401 y api() fuerza el re-login.
+    await api('/yo');
+    sedes = (await api('/sedes')).items;
+    filas = (await api('/estudiantes')).items;
+  } else {
+    sedes = await api('/rest/v1/sedes?select=id,nombre,plazas,orden&order=orden');
+    filas = await api('/rest/v1/estudiantes?select=*&order=gpa.desc.nullslast');
+  }
 
   // Las plazas mandan desde la tabla; el color y el nombre corto son de la interfaz
   sedes.forEach((s) => {
@@ -1403,6 +1435,12 @@ async function cargarDesdeTabla() {
 
 /** Escribe la sede de un estudiante. sedeId null = liberar la plaza. */
 function escribirSede(estudianteId, sedeId) {
+  if (ES_ORDS) {
+    return api('/asignar', {
+      method: 'POST',
+      body: JSON.stringify({ id: Number(estudianteId), sede_id: sedeId })
+    });
+  }
   return api('/rest/v1/estudiantes?id=eq.' + encodeURIComponent(estudianteId), {
     method: 'PATCH',
     headers: { Prefer: 'return=minimal' },
@@ -1512,12 +1550,15 @@ function vaciar() {
 
   if (!MODO_REMOTO) { guardar(); aviso('Tablero vaciado'); return; }
 
-  // Un solo PATCH para todas las filas asignadas
-  api('/rest/v1/estudiantes?sede_id=not.is.null', {
-    method: 'PATCH',
-    headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ sede_id: null })
-  }).then(() => {
+  // Una sola llamada para todas las filas asignadas
+  const limpiar = ES_ORDS
+    ? api('/vaciar', { method: 'POST', body: '{}' })
+    : api('/rest/v1/estudiantes?sede_id=not.is.null', {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ sede_id: null })
+      });
+  limpiar.then(() => {
     aviso('Tablero vaciado (' + asignadosPrevios.length + ' plazas liberadas)');
   }).catch(err => {
     aviso('No se pudo vaciar: ' + err.message, 'bad');
@@ -2497,6 +2538,14 @@ if (MODO_REMOTO) {
   });
 
   $('#btn-salir').addEventListener('click', () => {
+    // En ORDS se invalida el token también en el servidor (best effort).
+    if (ES_ORDS && sesion) {
+      fetch(SUPABASE.url + '/salir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Token': sesion.access_token },
+        body: '{}'
+      }).catch(() => { /* sin red: el token igual vence solo */ });
+    }
     guardarSesion(null);
     mostrarAcceso('Sesión cerrada.');
   });

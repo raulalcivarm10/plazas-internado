@@ -46,12 +46,17 @@ if (!plantilla.includes(MARCA)) {
 // Configuracion de Supabase. Sin url/anonKey la pagina queda en modo local.
 const MARCA_CFG = "/*__CONFIG__*/{ url: '', anonKey: '' }";
 const rutaCfg = path.join(RAIZ, 'src', 'config.json');
-let conexion = { url: '', anonKey: '' };
+let conexion = { url: '', anonKey: '', tipo: '' };
 if (fs.existsSync(rutaCfg)) {
   const bruto = JSON.parse(fs.readFileSync(rutaCfg, 'utf8'));
-  conexion = { url: (bruto.url || '').replace(/\/+$/, ''), anonKey: bruto.anonKey || '' };
+  conexion = {
+    url: (bruto.url || '').replace(/\/+$/, ''),
+    anonKey: bruto.anonKey || '',
+    tipo: bruto.tipo || ''
+  };
 }
-const remoto = Boolean(conexion.url && conexion.anonKey);
+// Remoto: Supabase (url + anonKey) u ORDS (url + tipo 'ords', sin key).
+const remoto = Boolean(conexion.url && (conexion.anonKey || conexion.tipo === 'ords'));
 
 // La version publica solo puede construirse con tabla configurada. Asi es
 // imposible generar un docs/index.html con datos personales incrustados.

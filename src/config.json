@@ -1,5 +1,6 @@
 {
-  "_ayuda": "Datos del proyecto de Supabase (Settings -> API). La anon/publishable key está pensada para ser pública: lo que protege los datos es RLS. La contraseña NO va aquí, la pide la pantalla de acceso. Si dejas los campos vacíos, la página funciona en modo local con los datos incrustados.",
-  "url": "https://zjnvwnyulhaxevpmosns.supabase.co",
-  "anonKey": "sb_publishable_Ugc1kW8AOBOlSk29ogTRIg_bYBBe2YP"
+  "_ayuda": "Conexión del tablero. Para Oracle/ORDS: tipo 'ords' y url del módulo (sin barra final); anonKey queda vacía. Para Supabase: url del proyecto + anonKey, sin tipo. Todo vacío = modo local con datos incrustados. La contraseña nunca va aquí: la pide la pantalla de acceso.",
+  "tipo": "ords",
+  "url": "https://api.quadratechsa.com:8443/ords/internado/plazas",
+  "anonKey": ""
 }
