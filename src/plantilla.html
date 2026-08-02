@@ -1295,9 +1295,15 @@ function recuperar() {
   catch (_) { return; }
   if (!datos) return;
 
+  // Los bloqueos se aplican ANTES de restaurar asignaciones, para descartar
+  // del restore a quien haya quedado bloqueado entre sesiones.
+  const bloq = new Set((datos.b || []).map(String));
+  ESTUDIANTES.forEach(e => { if (bloq.has(String(e.id))) e.bloqueado = true; });
+
   const limpio = {};
   Object.entries(datos.a || {}).forEach(([eid, sid]) => {
-    if (porId(eid) && sedePorId(sid)) limpio[eid] = sid;
+    const est = porId(eid);
+    if (est && sedePorId(sid) && !estaBloqueado(est)) limpio[eid] = sid;
   });
   // No confiar en los conteos guardados: recortar a la capacidad real de cada sede
   const cupo = {};
@@ -1315,10 +1321,6 @@ function recuperar() {
       if (final[eid] === s.id && !estado.orden[s.id].includes(eid)) estado.orden[s.id].push(eid);
     });
   });
-
-  // Bloqueos manuales guardados (modo local)
-  const bloq = new Set((datos.b || []).map(String));
-  ESTUDIANTES.forEach(e => { if (bloq.has(String(e.id))) e.bloqueado = true; });
 }
 
 /* ============================================================
@@ -1473,7 +1475,8 @@ async function cargarDesdeTabla() {
   estado.asignado = {};
   SEDES.forEach((s) => { estado.orden[s.id] = []; });
   ESTUDIANTES.forEach((e) => {
-    if (e.sedeId && SEDES.some((s) => s.id === e.sedeId)) {
+    // Un bloqueado (examen=0 o manual) nunca ocupa plaza: se queda en la nómina.
+    if (e.sedeId && SEDES.some((s) => s.id === e.sedeId) && !estaBloqueado(e)) {
       estado.asignado[e.id] = e.sedeId;
       estado.orden[e.sedeId].push(e.id);
     }
@@ -2111,7 +2114,7 @@ function pintarSedes() {
 
     const lista = document.createElement('div');
     lista.className = 'ward-list';
-    const asignados = estado.orden[sede.id].map(porId).filter(Boolean);
+    const asignados = estado.orden[sede.id].map(porId).filter(Boolean).filter(e => !estaBloqueado(e));
     if (!asignados.length) {
       const vac = document.createElement('p');
       vac.className = 'ward-empty';
@@ -2531,7 +2534,9 @@ function enlaceDeRespaldo(url, nombre) {
 
 function filasDe(sedeId) {
   // Mismo criterio que la nómina: por prioridad y dentro de cada una por GPA.
-  return ordenarPorPrioridad(estado.orden[sedeId].map(porId).filter(Boolean));
+  // Un bloqueado nunca cuenta como asignado (defensa: no debería estar aquí).
+  return ordenarPorPrioridad(
+    estado.orden[sedeId].map(porId).filter(Boolean).filter(e => !estaBloqueado(e)));
 }
 
 const sinAcentos = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '');

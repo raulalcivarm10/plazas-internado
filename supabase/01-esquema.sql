@@ -158,13 +158,13 @@ create policy "estudiantes_actualizar" on public.estudiantes
   using (public.es_autorizado())
   with check (public.es_autorizado());
 
--- La app solo cambia la sede. RLS no puede filtrar por columna, así que se
--- limita el UPDATE a sede_id con privilegios de columna: un intento de tocar
--- cédula, nombres o correos desde la app recibe "permission denied" y falla.
+-- La app solo cambia la sede y el bloqueo. RLS no puede filtrar por columna,
+-- así que se limita el UPDATE a esas dos con privilegios de columna: un intento
+-- de tocar cédula, nombres o correos desde la app recibe "permission denied".
 -- El trigger corre como dueño de la tabla, así que puede seguir fijando
 -- 'actualizado' sin que el llamante tenga ese privilegio.
 revoke update on public.estudiantes from authenticated;
-grant  update (sede_id) on public.estudiantes to authenticated;
+grant  update (sede_id, bloqueado) on public.estudiantes to authenticated;
 
 create policy "sedes_lectura" on public.sedes
   for select to authenticated using (public.es_autorizado());
