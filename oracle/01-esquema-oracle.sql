@@ -29,6 +29,7 @@ CREATE TABLE int_estudiantes (
   embarazada   VARCHAR2(20),
   hijos        NUMBER(4),
   estado_civil VARCHAR2(50),
+  bloqueado    NUMBER(1) DEFAULT 0 NOT NULL,   -- 1 = bloqueado manualmente
   sede_id      VARCHAR2(20),
   actualizado  TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
   CONSTRAINT fk_int_estud_sede FOREIGN KEY (sede_id) REFERENCES int_sedes(id) ON DELETE SET NULL

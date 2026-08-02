@@ -16,8 +16,13 @@ preferencia del sistema y recuerda la elección.
 botón *Filtros* abre un panel para descalificar candidatos por GPA, créditos, examen
 de ciencias clínicas, pensum/malla, estado civil, hijos, discapacidad y embarazo. Se
 combinan (todos deben cumplirse) y el tipo de control se detecta solo según los datos:
-rango numérico para GPA/créditos/examen, chips de categoría para el resto. Los campos
-aparecen a medida que se llenan en el Excel — no hay que tocar código.
+rango numérico para GPA/créditos/examen, chips de categoría (con etiquetas legibles)
+para el resto. Los campos aparecen a medida que se llenan en el Excel.
+
+**Bloqueo.** Quien tiene el examen de ciencias clínicas en 0 no aprobó el requisito:
+sale en rojo, al final de la nómina y no se puede asignar. Además cada ficha tiene un
+botón para **bloquear/desbloquear** manualmente (p. ej. documento faltante); el
+bloqueo se guarda en la base, así ambas coordinadoras lo ven.
 
 | Sede | Plazas |
 |---|---|

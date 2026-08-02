@@ -90,7 +90,7 @@ END;]'
     p_source_type => ORDS.source_type_query,
     p_source      => 'SELECT id, apellidos, nombres, codigo, cedula, correo_inst, ' ||
                      'correo_pers, celular, gpa, creditos, examen, pensum, ' ||
-                     'discapacidad, embarazada, hijos, estado_civil, sede_id ' ||
+                     'discapacidad, embarazada, hijos, estado_civil, bloqueado, sede_id ' ||
                      'FROM int_estudiantes ' ||
                      'WHERE int_auth.validar(:token) IS NOT NULL ORDER BY apellidos');
   ORDS.DEFINE_PARAMETER(
@@ -130,6 +130,37 @@ END;]'
   );
   ORDS.DEFINE_PARAMETER(
     p_module_name => 'plazas', p_pattern => 'asignar', p_method => 'POST',
+    p_name => 'X-Token', p_bind_variable_name => 'token',
+    p_source_type => 'HEADER', p_param_type => 'STRING', p_access_method => 'IN');
+
+  ------------------------------------------------------------------ bloquear
+  ORDS.DEFINE_TEMPLATE(p_module_name => 'plazas', p_pattern => 'bloquear');
+  ORDS.DEFINE_HANDLER(
+    p_module_name => 'plazas', p_pattern => 'bloquear', p_method => 'POST',
+    p_source_type => ORDS.source_type_plsql,
+    p_source      => q'[
+DECLARE
+  v_email VARCHAR2(200);
+BEGIN
+  v_email := int_auth.validar(:token);
+  IF v_email IS NULL THEN
+    :status_code := 401;
+    HTP.p('{"error":"sesion no valida"}');
+    RETURN;
+  END IF;
+  UPDATE int_estudiantes SET bloqueado = :bloqueado WHERE id = :id;
+  IF SQL%ROWCOUNT = 0 THEN
+    ROLLBACK;
+    :status_code := 404;
+    HTP.p('{"error":"estudiante no existe"}');
+  ELSE
+    COMMIT;
+    HTP.p('{"ok":true}');
+  END IF;
+END;]'
+  );
+  ORDS.DEFINE_PARAMETER(
+    p_module_name => 'plazas', p_pattern => 'bloquear', p_method => 'POST',
     p_name => 'X-Token', p_bind_variable_name => 'token',
     p_source_type => 'HEADER', p_param_type => 'STRING', p_access_method => 'IN');
 

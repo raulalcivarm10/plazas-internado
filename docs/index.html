@@ -479,6 +479,33 @@ body {
 .rec.picked { background: color-mix(in srgb, var(--hng) 12%, var(--surface)); }
 .rec.picked .rec-rail { background: var(--hng); }
 
+/* Bloqueado: fondo rojo tenue, sin cursor de arrastre. No participa del sorteo. */
+.rec.bloqueado {
+  cursor: not-allowed;
+  background: color-mix(in srgb, var(--alert) 9%, var(--surface));
+}
+.rec.bloqueado:hover { background: color-mix(in srgb, var(--alert) 14%, var(--surface)); }
+.rec.bloqueado .rec-name { color: var(--alert); text-decoration: line-through; text-decoration-thickness: 1px; }
+
+/* Botón de bloqueo en la ficha */
+.rec-bloq {
+  margin-top: 8px;
+  width: 100%;
+  padding: 5px 10px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .13s, border-color .13s, color .13s;
+}
+.rec-bloq:hover:not(:disabled) { border-color: var(--alert); color: var(--alert); background: color-mix(in srgb, var(--alert) 8%, transparent); }
+.rec-bloq.on { color: var(--alert); border-color: color-mix(in srgb, var(--alert) 45%, transparent); background: color-mix(in srgb, var(--alert) 10%, transparent); }
+.rec-bloq:disabled { cursor: not-allowed; color: var(--alert); border-color: color-mix(in srgb, var(--alert) 35%, transparent); background: color-mix(in srgb, var(--alert) 8%, transparent); }
+
 .rec-rail {
   background: var(--line);
   display: flex;
@@ -1119,10 +1146,10 @@ const LLAVE = 'plazas.tablero.v2';
 // chips de categoría) NO se fija aquí: se detecta solo según los datos, así el
 // filtro se adapta a lo que se llene en el Excel sin tocar código.
 const CAMPOS_FILTRO = [
-  { k: 'prioridad',   label: 'Prioridad' },
+  { k: 'prioridad',   label: 'Prioridad', etiqueta: v => (PRIORIDADES[Number(v)] || {}).et || v },
   { k: 'gpa',         label: 'GPA' },
   { k: 'creditos',    label: 'Créditos' },
-  { k: 'examen',      label: 'Examen Cs. Clínicas' },
+  { k: 'examen',      label: 'Examen Cs. Clínicas', etiqueta: v => Number(v) === 0 ? 'No aprobado (0)' : 'Aprobado (' + v + ')' },
   { k: 'pensum',      label: 'Pensum / Malla' },
   { k: 'estadoCivil', label: 'Estado civil' },
   { k: 'hijos',       label: 'Hijos' },
@@ -1163,10 +1190,24 @@ function recomputarPrioridades() {
   });
 }
 
-// Orden de selección: por prioridad (1→6) y dentro de cada una por GPA desc.
+// examen === 0 = no aprobó el examen de ciencias clínicas: es requisito para
+// postular, así que queda bloqueado (no se puede mover). null/'' = sin dato.
+function esExamenCero(e) {
+  return e.examen !== '' && e.examen != null && Number(e.examen) === 0;
+}
+
+// Bloqueado: por no aprobar el examen (duro) o por bloqueo manual del coordinador.
+function estaBloqueado(e) {
+  return esExamenCero(e) || e.bloqueado === true || e.bloqueado === 1 || e.bloqueado === '1';
+}
+
+// Orden de selección: los bloqueados SIEMPRE al final; el resto por prioridad
+// (1→6) y dentro de cada una por GPA desc.
 function ordenarPorPrioridad(lista) {
   return lista.slice().sort((a, b) =>
-    (a.prioridad - b.prioridad) || ((b.gpa != null ? b.gpa : -1) - (a.gpa != null ? a.gpa : -1)));
+    ((estaBloqueado(a) ? 1 : 0) - (estaBloqueado(b) ? 1 : 0)) ||
+    (a.prioridad - b.prioridad) ||
+    ((b.gpa != null ? b.gpa : -1) - (a.gpa != null ? a.gpa : -1)));
 }
 
 const estado = {
@@ -1243,7 +1284,8 @@ function aviso(texto, tipo = 'plain') {
 }
 
 function guardar() {
-  try { localStorage.setItem(LLAVE, JSON.stringify({ a: estado.asignado, o: estado.orden })); }
+  const bloqueados = ESTUDIANTES.filter(e => e.bloqueado === true).map(e => String(e.id));
+  try { localStorage.setItem(LLAVE, JSON.stringify({ a: estado.asignado, o: estado.orden, b: bloqueados })); }
   catch (_) { /* almacenamiento no disponible */ }
 }
 
@@ -1273,6 +1315,10 @@ function recuperar() {
       if (final[eid] === s.id && !estado.orden[s.id].includes(eid)) estado.orden[s.id].push(eid);
     });
   });
+
+  // Bloqueos manuales guardados (modo local)
+  const bloq = new Set((datos.b || []).map(String));
+  ESTUDIANTES.forEach(e => { if (bloq.has(String(e.id))) e.bloqueado = true; });
 }
 
 /* ============================================================
@@ -1390,6 +1436,7 @@ function desdeFila(f) {
     embarazada: f.embarazada || '',
     hijos: f.hijos != null ? f.hijos : '',
     estadoCivil: f.estado_civil || '',
+    bloqueado: f.bloqueado === 1 || f.bloqueado === true || f.bloqueado === '1',
     sedeId: f.sede_id || null
   };
 }
@@ -1448,6 +1495,31 @@ function escribirSede(estudianteId, sedeId) {
   });
 }
 
+/** Escribe el bloqueo manual de un estudiante (1 = bloqueado). */
+function escribirBloqueo(estudianteId, bloqueado) {
+  if (ES_ORDS) {
+    return api('/bloquear', {
+      method: 'POST',
+      body: JSON.stringify({ id: Number(estudianteId), bloqueado: bloqueado ? 1 : 0 })
+    });
+  }
+  return api('/rest/v1/estudiantes?id=eq.' + encodeURIComponent(estudianteId), {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ bloqueado: !!bloqueado })
+  });
+}
+
+/** Persiste el bloqueo. Como asignar: optimista y revierte si el backend falla. */
+function persistirBloqueo(id, valor, revertir) {
+  if (!MODO_REMOTO) { guardar(); return; }
+  escribirBloqueo(id, valor).catch(err => {
+    revertir();
+    pintar();
+    aviso('No se pudo guardar el bloqueo: ' + err.message, 'bad');
+  });
+}
+
 /**
  * Persiste un cambio. En local basta con localStorage; contra la tabla se
  * escribe de inmediato y, si falla, se revierte para que la pantalla nunca
@@ -1473,9 +1545,23 @@ async function persistir(estudianteId, sedeId, revertir) {
    ACCIONES
    ============================================================ */
 function fijar(id) {
+  const est = porId(id);
+  if (est && estaBloqueado(est)) return;   // un bloqueado no se puede fijar
   estado.fijado = String(estado.fijado) === String(id) ? null : String(id);
   pintarNomina();
   if (estado.fijado) aviso('Postulante fijado — ahora elige una sede');
+}
+
+// Bloquea o desbloquea manualmente. El examen=0 no se puede togglear (requisito).
+function alternarBloqueo(id) {
+  const est = porId(id);
+  if (!est || esExamenCero(est)) return;
+  const nuevo = !(est.bloqueado === true || est.bloqueado === 1 || est.bloqueado === '1');
+  est.bloqueado = nuevo;
+  if (String(estado.fijado) === String(id)) estado.fijado = null;
+  pintar();
+  aviso(est.apellidos + (nuevo ? ' bloqueado' : ' desbloqueado'), nuevo ? 'bad' : 'ok');
+  persistirBloqueo(id, nuevo, () => { est.bloqueado = !nuevo; });
 }
 
 function asignar(estudianteId, sedeId) {
@@ -1484,6 +1570,12 @@ function asignar(estudianteId, sedeId) {
   const sede = sedePorId(sedeId);
   if (!est || !sede) return false;
   if (estado.asignado[eid] === sedeId) return false;
+
+  if (estaBloqueado(est)) {
+    aviso(esExamenCero(est) ? est.apellidos + ' no aprobó el examen: no puede postular'
+                            : est.apellidos + ' está bloqueado', 'bad');
+    return false;
+  }
 
   if (ocupadas(sedeId) >= sede.plazas) {
     const nodo = $('#wards [data-sede="' + sedeId + '"]');
@@ -1737,7 +1829,9 @@ function renderPanelFiltros() {
         const chip = document.createElement('button');
         chip.type = 'button';
         chip.className = 'chip' + (activo ? ' on' : '');
-        chip.textContent = v;
+        // Etiqueta legible si el campo la define (ej. prioridad: "P1 · Mérito").
+        chip.textContent = c.etiqueta ? c.etiqueta(v) : v;
+        chip.title = chip.textContent;
         chip.addEventListener('click', () => {
           const cur = estado.filtros[c.k] || { tipo: 'facet', sel: new Set() };
           cur.tipo = 'facet';
@@ -1785,18 +1879,22 @@ function actualizarConteoFiltro() {
    PINTADO
    ============================================================ */
 function fichaNomina(est) {
+  const bloqueado = estaBloqueado(est);
+  const examenCero = esExamenCero(est);
+
   const art = document.createElement('article');
-  art.className = 'rec';
+  art.className = 'rec' + (bloqueado ? ' bloqueado' : '');
   if (String(estado.fijado) === String(est.id)) art.classList.add('picked');
 
   // Rail coloreado por prioridad (Art. 11): el color agrupa la nómina de un vistazo.
+  // Si está bloqueado, el rail va en rojo (no participa del sorteo).
   const prio = est.prioridad || 6;
   const infoP = PRIORIDADES[prio];
   const rail = document.createElement('div');
   rail.className = 'rec-rail';
-  rail.style.background = infoP.color;
-  rail.textContent = prio <= 5 ? ('P' + prio) : '—';
-  rail.title = infoP.et;
+  rail.style.background = bloqueado ? 'var(--alert)' : infoP.color;
+  rail.textContent = bloqueado ? '⛔' : (prio <= 5 ? ('P' + prio) : '—');
+  rail.title = bloqueado ? (examenCero ? 'No aprobó el examen' : 'Bloqueado') : infoP.et;
 
   const main = document.createElement('div');
   main.className = 'rec-main';
@@ -1817,9 +1915,15 @@ function fichaNomina(est) {
   main.querySelector('.rec-given').textContent = est.nombres;
   main.querySelector('.gpa-num').textContent = est.gpa != null ? Number(est.gpa).toFixed(2) : '—';
   const prioTag = main.querySelector('.rec-prio');
-  prioTag.textContent = infoP.et;
-  prioTag.style.color = infoP.color;
-  prioTag.style.borderColor = infoP.color;
+  if (bloqueado) {
+    prioTag.textContent = examenCero ? '⛔ No aprobó el examen' : '⛔ Bloqueado';
+    prioTag.style.color = 'var(--alert)';
+    prioTag.style.borderColor = 'var(--alert)';
+  } else {
+    prioTag.textContent = infoP.et;
+    prioTag.style.color = infoP.color;
+    prioTag.style.borderColor = infoP.color;
+  }
   main.querySelectorAll('[data-k]').forEach(dd => {
     const v = est[dd.dataset.k] || '—';
     dd.textContent = v;
@@ -1849,9 +1953,33 @@ function fichaNomina(est) {
     main.appendChild(row);
   }
 
+  // Botón de bloqueo manual. El examen=0 es un bloqueo duro (requisito no
+  // cumplido): se muestra como candado fijo, sin poder desbloquear.
+  const btnBloq = document.createElement('button');
+  btnBloq.type = 'button';
+  btnBloq.className = 'rec-bloq' + (bloqueado ? ' on' : '');
+  if (examenCero) {
+    btnBloq.textContent = '⛔ No aprobó examen';
+    btnBloq.disabled = true;
+    btnBloq.title = 'No aprobó el examen de ciencias clínicas: no puede postular';
+  } else {
+    btnBloq.textContent = bloqueado ? '🔓 Desbloquear' : '🔒 Bloquear';
+    btnBloq.addEventListener('click', ev => { ev.stopPropagation(); alternarBloqueo(est.id); });
+  }
+  main.appendChild(btnBloq);
+
   art.append(rail, main);
-  art.addEventListener('click', () => fijar(est.id));
-  hacerArrastrable(art, est.id);
+
+  if (bloqueado) {
+    // Bloqueado: no se arrastra ni se fija; el clic solo avisa por qué.
+    art.addEventListener('click', () => {
+      aviso(examenCero ? est.apellidos + ' no aprobó el examen: no puede postular'
+                       : est.apellidos + ' está bloqueado', 'bad');
+    });
+  } else {
+    art.addEventListener('click', () => fijar(est.id));
+    hacerArrastrable(art, est.id);
+  }
   return art;
 }
 

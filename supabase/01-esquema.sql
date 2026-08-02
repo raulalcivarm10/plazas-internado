@@ -44,6 +44,7 @@ alter table public.estudiantes add column if not exists discapacidad text;
 alter table public.estudiantes add column if not exists embarazada   text;
 alter table public.estudiantes add column if not exists hijos        integer;
 alter table public.estudiantes add column if not exists estado_civil text;
+alter table public.estudiantes add column if not exists bloqueado    boolean not null default false;
 
 insert into public.sedes (id, nombre, plazas, orden) values
   ('heom', 'Hospital Enrique Ortega Moreira', 30, 1),
