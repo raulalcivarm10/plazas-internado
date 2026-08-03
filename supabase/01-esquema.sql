@@ -185,3 +185,23 @@ create policy "config_lectura" on public.config
 create policy "config_actualizar" on public.config
   for update to authenticated
   using (public.es_autorizado()) with check (public.es_autorizado());
+
+-- Período abierto = finalizado != '1'. security definer: lee config aunque el
+-- llamante no pudiera. Se redefine aquí la policy de UPDATE de estudiantes para
+-- que, con el período cerrado, la base rechace la escritura (equivalente al 423
+-- de ORDS). config_actualizar se deja intacta para poder reabrir.
+create or replace function public.periodo_abierto()
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select coalesce((select valor from public.config where clave = 'finalizado'), '0') <> '1';
+$$;
+
+drop policy if exists "estudiantes_actualizar" on public.estudiantes;
+create policy "estudiantes_actualizar" on public.estudiantes
+  for update to authenticated
+  using (public.es_autorizado() and public.periodo_abierto())
+  with check (public.es_autorizado() and public.periodo_abierto());
