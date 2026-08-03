@@ -143,8 +143,28 @@ body {
   margin: 0;
 }
 
+/* Período de la cohorte: pastilla con el acento de la marca */
+.periodo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 9px;
+  padding: 5px 13px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  color: var(--heom);
+  background: color-mix(in srgb, var(--heom) 11%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--heom) 32%, transparent);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.periodo-badge svg { width: 14px; height: 14px; flex: none; opacity: .85; }
+.periodo-sep { opacity: .55; margin: 0 1px; }
+
 .board-head .lede {
-  margin: 7px 0 0;
+  margin: 10px 0 0;
   font-size: 13px;
   color: var(--ink-2);
   max-width: 62ch;
@@ -575,7 +595,8 @@ body.suspenso .rec.revelado .rec-main {
 @media (prefers-reduced-motion: reduce) {
   body.suspenso .rec.revelado .rec-main { animation: none; }
 }
-body.suspenso .rec:not(.revelado) { cursor: pointer; }
+/* La ficha oculta no se revela al clicar el cuerpo: solo el ojito. */
+body.suspenso .rec:not(.revelado) { cursor: default; }
 body.suspenso .rec.revelado .rec-ojo .ojo-ver { display: none; }
 body.suspenso .rec.revelado .rec-ojo .ojo-oculto { display: block; }
 
@@ -1093,8 +1114,12 @@ body.suspenso .rec.revelado .rec-ojo .ojo-oculto { display: block; }
 <body>
 <header class="board-head">
   <div class="title-block">
-    <p class="eyebrow">Internado rotativo &middot; Guayaquil</p>
+    <p class="eyebrow">Internado Rotativo &middot; II Cohorte</p>
     <h1>Selección de Plazas Hospitalarias</h1>
+    <span class="periodo-badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      1 septiembre 2026 <span class="periodo-sep">—</span> 31 agosto 2027
+    </span>
     <p class="lede">
       Arrastra cada postulante de la nómina a una sede. Cada plaza ocupada apaga un
       segmento del contador; al llegar a cero la sede deja de admitir.
@@ -2167,14 +2192,15 @@ function fichaNomina(est) {
   if (bloqueado) {
     // Bloqueado: no se arrastra ni se fija; el clic solo avisa por qué.
     art.addEventListener('click', () => {
-      if (estado.suspenso && !estado.revelados.has(String(est.id))) { revelar(est.id); return; }
+      // En suspenso, una ficha oculta solo se revela con el ojito: el clic al cuerpo no hace nada.
+      if (estado.suspenso && !estado.revelados.has(String(est.id))) return;
       aviso(reprobo ? est.apellidos + ' no aprobó el examen: no puede postular'
                     : est.apellidos + ' está bloqueado', 'bad');
     });
   } else {
     art.addEventListener('click', () => {
-      // En suspenso, el primer clic sobre una ficha oculta la revela; luego opera normal.
-      if (estado.suspenso && !estado.revelados.has(String(est.id))) { revelar(est.id); return; }
+      // En suspenso, una ficha oculta solo se revela con el ojito (no al clicar el cuerpo).
+      if (estado.suspenso && !estado.revelados.has(String(est.id))) return;
       fijar(est.id);
     });
     hacerArrastrable(art, est.id);
