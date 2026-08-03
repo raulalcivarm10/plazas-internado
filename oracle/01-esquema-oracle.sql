@@ -40,6 +40,25 @@ INSERT INTO int_sedes (id, nombre, plazas, orden) VALUES ('hng',  'Hospital Nava
 INSERT INTO int_sedes (id, nombre, plazas, orden) VALUES ('hagp', 'Hospital Abel Gilbert Ponton',    15, 3);
 COMMIT;
 
+-- Config del periodo. finalizado='1' cierra el sorteo: no se asigna, bloquea ni
+-- vacia; solo se descarga. La app lo lee al entrar y las escrituras lo verifican.
+CREATE TABLE int_config (
+  clave VARCHAR2(50)  CONSTRAINT pk_int_config PRIMARY KEY,
+  valor VARCHAR2(200)
+);
+INSERT INTO int_config (clave, valor) VALUES ('finalizado', '0');
+COMMIT;
+
+CREATE OR REPLACE FUNCTION int_finalizado RETURN NUMBER IS
+  v VARCHAR2(200);
+BEGIN
+  SELECT valor INTO v FROM int_config WHERE clave = 'finalizado';
+  RETURN CASE WHEN v = '1' THEN 1 ELSE 0 END;
+EXCEPTION WHEN NO_DATA_FOUND THEN
+  RETURN 0;
+END;
+/
+
 -- Regla de cupo. Trigger COMPUESTO a proposito: uno normal daria el error de
 -- "tabla mutante" al contar sobre la misma tabla que se esta modificando.
 CREATE OR REPLACE TRIGGER trg_int_cupo

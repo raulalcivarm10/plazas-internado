@@ -7,12 +7,15 @@
 --    GET  yo           (X-Token)           -> {email} | 401
 --    GET  sedes        (X-Token)           -> {items:[...]}
 --    GET  estudiantes  (X-Token)           -> {items:[...]}
---    POST asignar      {id, sede_id|null}  -> {ok} | 409 cupo lleno
---    POST vaciar       (X-Token)           -> {ok, liberadas}
+--    POST asignar      {id, sede_id|null}  -> {ok} | 409 cupo | 423 finalizado
+--    POST bloquear     {id, bloqueado}     -> {ok} | 423 finalizado
+--    POST vaciar       (X-Token)           -> {ok, liberadas} | 423 finalizado
+--    GET  config       (X-Token)           -> {finalizado}
+--    POST finalizar    {finalizado}        -> {ok, finalizado}
 --    POST salir        (X-Token)           -> {ok}
 --
 --  Sin token valido, sedes/estudiantes devuelven vacio y las
---  escrituras 401: mismo comportamiento que tenia RLS.
+--  escrituras 401. Con el periodo finalizado, las escrituras 423.
 -- ============================================================
 
 BEGIN
@@ -113,6 +116,11 @@ BEGIN
     HTP.p('{"error":"sesion no valida"}');
     RETURN;
   END IF;
+  IF int_finalizado = 1 THEN
+    :status_code := 423;
+    HTP.p('{"error":"periodo finalizado"}');
+    RETURN;
+  END IF;
   UPDATE int_estudiantes SET sede_id = :sede_id WHERE id = :id;
   IF SQL%ROWCOUNT = 0 THEN
     ROLLBACK;
@@ -148,6 +156,11 @@ BEGIN
     HTP.p('{"error":"sesion no valida"}');
     RETURN;
   END IF;
+  IF int_finalizado = 1 THEN
+    :status_code := 423;
+    HTP.p('{"error":"periodo finalizado"}');
+    RETURN;
+  END IF;
   UPDATE int_estudiantes SET bloqueado = :bloqueado WHERE id = :id;
   IF SQL%ROWCOUNT = 0 THEN
     ROLLBACK;
@@ -180,6 +193,11 @@ BEGIN
     HTP.p('{"error":"sesion no valida"}');
     RETURN;
   END IF;
+  IF int_finalizado = 1 THEN
+    :status_code := 423;
+    HTP.p('{"error":"periodo finalizado"}');
+    RETURN;
+  END IF;
   UPDATE int_estudiantes SET sede_id = NULL WHERE sede_id IS NOT NULL;
   v_n := SQL%ROWCOUNT;
   COMMIT;
@@ -188,6 +206,53 @@ END;]'
   );
   ORDS.DEFINE_PARAMETER(
     p_module_name => 'plazas', p_pattern => 'vaciar', p_method => 'POST',
+    p_name => 'X-Token', p_bind_variable_name => 'token',
+    p_source_type => 'HEADER', p_param_type => 'STRING', p_access_method => 'IN');
+
+  ------------------------------------------------------------------ config (GET)
+  ORDS.DEFINE_TEMPLATE(p_module_name => 'plazas', p_pattern => 'config');
+  ORDS.DEFINE_HANDLER(
+    p_module_name => 'plazas', p_pattern => 'config', p_method => 'GET',
+    p_source_type => ORDS.source_type_plsql,
+    p_source      => q'[
+BEGIN
+  IF int_auth.validar(:token) IS NULL THEN
+    :status_code := 401;
+    HTP.p('{"error":"sesion no valida"}');
+  ELSE
+    HTP.p('{"finalizado":' || int_finalizado || '}');
+  END IF;
+END;]'
+  );
+  ORDS.DEFINE_PARAMETER(
+    p_module_name => 'plazas', p_pattern => 'config', p_method => 'GET',
+    p_name => 'X-Token', p_bind_variable_name => 'token',
+    p_source_type => 'HEADER', p_param_type => 'STRING', p_access_method => 'IN');
+
+  ------------------------------------------------------------------ finalizar (POST)
+  ORDS.DEFINE_TEMPLATE(p_module_name => 'plazas', p_pattern => 'finalizar');
+  ORDS.DEFINE_HANDLER(
+    p_module_name => 'plazas', p_pattern => 'finalizar', p_method => 'POST',
+    p_source_type => ORDS.source_type_plsql,
+    p_source      => q'[
+DECLARE
+  v_val VARCHAR2(10) := CASE WHEN :finalizado = 1 OR :finalizado = '1' THEN '1' ELSE '0' END;
+BEGIN
+  IF int_auth.validar(:token) IS NULL THEN
+    :status_code := 401;
+    HTP.p('{"error":"sesion no valida"}');
+    RETURN;
+  END IF;
+  UPDATE int_config SET valor = v_val WHERE clave = 'finalizado';
+  IF SQL%ROWCOUNT = 0 THEN
+    INSERT INTO int_config (clave, valor) VALUES ('finalizado', v_val);
+  END IF;
+  COMMIT;
+  HTP.p('{"ok":true,"finalizado":' || v_val || '}');
+END;]'
+  );
+  ORDS.DEFINE_PARAMETER(
+    p_module_name => 'plazas', p_pattern => 'finalizar', p_method => 'POST',
     p_name => 'X-Token', p_bind_variable_name => 'token',
     p_source_type => 'HEADER', p_param_type => 'STRING', p_access_method => 'IN');
 

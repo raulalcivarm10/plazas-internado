@@ -28,6 +28,7 @@
 
   --ok:         #2E6E5E;
   --alert:      #B4402C;
+  --alt:        #B8791F;   /* ámbar — malla anterior (no rinde examen) */
   --focus:      #33578F;
 
   --shadow-sm: 0 1px 2px rgba(22, 33, 30, .06);
@@ -68,7 +69,7 @@
   --line:#2B3B36; --line-soft:#223029;
   --ink:#E6EDEA; --ink-2:#A3B5AE; --ink-3:#71857D;
   --heom:#5FB39B; --hng:#7BA3DC; --hagp:#D6906B;
-  --ok:#5FB39B; --alert:#E08871; --focus:#7BA3DC;
+  --ok:#5FB39B; --alert:#E08871; --alt:#D8A24A; --focus:#7BA3DC;
   --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
   --shadow-md: 0 8px 22px -10px rgba(0,0,0,.7);
 }
@@ -77,7 +78,7 @@
   --line:#D3DCD7; --line-soft:#E2E8E4;
   --ink:#16211E; --ink-2:#4A5C55; --ink-3:#7E8F88;
   --heom:#2E6E5E; --hng:#33578F; --hagp:#A85434;
-  --ok:#2E6E5E; --alert:#B4402C; --focus:#33578F;
+  --ok:#2E6E5E; --alert:#B4402C; --alt:#B8791F; --focus:#33578F;
   --shadow-sm: 0 1px 2px rgba(22,33,30,.06);
   --shadow-md: 0 6px 18px -8px rgba(22,33,30,.28);
 }
@@ -215,6 +216,29 @@ body {
   color: var(--surface);
 }
 .btn-solid:hover { background: var(--ok); border-color: var(--ok); filter: brightness(1.08); }
+
+/* Botón Finalizar / Reabrir */
+.btn-final { border-color: color-mix(in srgb, var(--alert) 45%, transparent); color: var(--alert); }
+.btn-final:hover { background: color-mix(in srgb, var(--alert) 10%, transparent); border-color: var(--alert); }
+.btn-final.reabrir { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.btn-final.reabrir:hover { background: color-mix(in srgb, var(--ok) 10%, transparent); border-color: var(--ok); }
+
+/* Banner de período finalizado */
+.banner-final {
+  position: relative;
+  z-index: 2;
+  padding: 9px 28px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--alert);
+  background: color-mix(in srgb, var(--alert) 12%, var(--surface));
+  border-bottom: 1px solid color-mix(in srgb, var(--alert) 35%, transparent);
+}
+
+/* Período finalizado: los controles de cambio quedan inertes (solo descargas). */
+body.finalizado .rec-bloq,
+body.finalizado .slot-pull { opacity: .35; pointer-events: none; }
+body.finalizado .rec { cursor: default; }
 
 /* Botón de tema: solo icono. En tema oscuro muestra el sol (para pasar a claro),
    en tema claro muestra la luna. aplicarTema() fija data-theme en la raíz. */
@@ -486,6 +510,12 @@ body {
 }
 .rec.bloqueado:hover { background: color-mix(in srgb, var(--alert) 14%, var(--surface)); }
 .rec.bloqueado .rec-name { color: var(--alert); text-decoration: line-through; text-decoration-thickness: 1px; }
+
+/* Malla anterior (no rinde examen): ámbar. Sí se arrastra y ocupa plaza. */
+.rec.alterna { background: color-mix(in srgb, var(--alt) 10%, var(--surface)); }
+.rec.alterna:hover { background: color-mix(in srgb, var(--alt) 16%, var(--surface)); }
+.rec.alterna .rec-name { color: var(--alt); }
+.crit.crit-alt { color: var(--alt); border-color: color-mix(in srgb, var(--alt) 45%, transparent); font-weight: 600; }
 
 /* Botón de bloqueo en la ficha */
 .rec-bloq {
@@ -1049,8 +1079,16 @@ body {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
       Descargar consolidado
     </button>
+    <button class="btn btn-final" id="btn-finalizar" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3v18"/><path d="M5 4h13l-2 4 2 4H5"/></svg>
+      <span id="btn-finalizar-txt">Finalizar sorteo</span>
+    </button>
   </div>
 </header>
+
+<div class="banner-final" id="banner-final" hidden>
+  🔒 Período finalizado — el tablero está cerrado. Solo puedes descargar los reportes.
+</div>
 
 
 <main class="board">
@@ -1190,15 +1228,35 @@ function recomputarPrioridades() {
   });
 }
 
-// examen === 0 = no aprobó el examen de ciencias clínicas: es requisito para
-// postular, así que queda bloqueado (no se puede mover). null/'' = sin dato.
+// Solo estas mallas rinden el Examen de Cs. Clínicas. Quien viene de una malla
+// anterior NO da examen: un 0 en su casilla significa "no aplica", no que haya
+// reprobado, así que no se bloquea (se distingue por color de tarjeta).
+const MALLAS_CON_EXAMEN = new Set(['1360', '1271']);
+
+// Malla del estudiante como texto limpio ('' si no hay dato).
+function mallaDe(e) { return String(e.pensum == null ? '' : e.pensum).trim(); }
+
+// Malla anterior CONOCIDA, distinta de las vigentes: no rinde el examen. Sin dato
+// de malla NO se asume alterna, para no relajar el criterio duro por un vacío.
+function esMallaAlterna(e) {
+  const m = mallaDe(e);
+  return m !== '' && !MALLAS_CON_EXAMEN.has(m);
+}
+
+// examen === 0 en bruto. null/'' = sin dato.
 function esExamenCero(e) {
   return e.examen !== '' && e.examen != null && Number(e.examen) === 0;
 }
 
-// Bloqueado: por no aprobar el examen (duro) o por bloqueo manual del coordinador.
+// Reprobó el examen (bloqueo duro): un 0 solo reprueba a quien SÍ rinde examen.
+// Una malla anterior con 0 no reprueba: es "no aplica".
+function reproboExamen(e) {
+  return esExamenCero(e) && !esMallaAlterna(e);
+}
+
+// Bloqueado: por reprobar el examen requerido (duro) o por bloqueo manual del coordinador.
 function estaBloqueado(e) {
-  return esExamenCero(e) || e.bloqueado === true || e.bloqueado === 1 || e.bloqueado === '1';
+  return reproboExamen(e) || e.bloqueado === true || e.bloqueado === 1 || e.bloqueado === '1';
 }
 
 // Orden de selección: los bloqueados SIEMPRE al final; el resto por prioridad
@@ -1216,6 +1274,7 @@ const estado = {
   filtro: '',
   filtros: {},    // { campo: {min,max} para rango | Set de valores para chips }
   panelAbierto: false,
+  finalizado: false,  // período cerrado: solo lectura y descargas
   fijado: null,
   arrastrando: null
 };
@@ -1467,6 +1526,9 @@ async function cargarDesdeTabla() {
 
   ESTUDIANTES = filas.map(desdeFila);
 
+  // Estado del período (finalizado o no).
+  estado.finalizado = await leerFinalizado();
+
   // Al cambiar de dataset se reinician los filtros: si no, un filtro de la sesión
   // anterior seguiría vivo sobre la nómina nueva (otra coordinadora), filtrando en
   // silencio, y el tipo de un campo podría cambiar (chips↔rango) sin coincidir.
@@ -1480,6 +1542,35 @@ async function cargarDesdeTabla() {
       estado.asignado[e.id] = e.sedeId;
       estado.orden[e.sedeId].push(e.id);
     }
+  });
+}
+
+const LLAVE_FINAL = 'plazas.finalizado.v1';
+
+/** Lee si el período está finalizado (según el backend, o localStorage en local). */
+async function leerFinalizado() {
+  if (!MODO_REMOTO) {
+    try { return localStorage.getItem(LLAVE_FINAL) === '1'; } catch (_) { return false; }
+  }
+  try {
+    if (ES_ORDS) return Number((await api('/config')).finalizado) === 1;
+    const filas = await api('/rest/v1/config?select=valor&clave=eq.finalizado');
+    return Array.isArray(filas) && filas[0] && String(filas[0].valor) === '1';
+  } catch (_) { return false; }
+}
+
+/** Escribe el estado del período. */
+function escribirFinalizado(valor) {
+  if (!MODO_REMOTO) {
+    try { localStorage.setItem(LLAVE_FINAL, valor ? '1' : '0'); } catch (_) { /* */ }
+    return Promise.resolve();
+  }
+  if (ES_ORDS) {
+    return api('/finalizar', { method: 'POST', body: JSON.stringify({ finalizado: valor ? 1 : 0 }) });
+  }
+  return api('/rest/v1/config?clave=eq.finalizado', {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ valor: valor ? '1' : '0' })
   });
 }
 
@@ -1547,7 +1638,18 @@ async function persistir(estudianteId, sedeId, revertir) {
 /* ============================================================
    ACCIONES
    ============================================================ */
+// Con el período finalizado el tablero es de solo lectura: cualquier cambio se
+// frena aquí (y el servidor también lo rechaza, por si acaso).
+function periodoAbierto() {
+  if (estado.finalizado) {
+    aviso('El período está finalizado: solo lectura y descargas', 'bad');
+    return false;
+  }
+  return true;
+}
+
 function fijar(id) {
+  if (estado.finalizado) return;
   const est = porId(id);
   if (est && estaBloqueado(est)) return;   // un bloqueado no se puede fijar
   estado.fijado = String(estado.fijado) === String(id) ? null : String(id);
@@ -1555,10 +1657,11 @@ function fijar(id) {
   if (estado.fijado) aviso('Postulante fijado — ahora elige una sede');
 }
 
-// Bloquea o desbloquea manualmente. El examen=0 no se puede togglear (requisito).
+// Bloquea o desbloquea manualmente. Reprobar el examen requerido no se puede togglear.
 function alternarBloqueo(id) {
+  if (!periodoAbierto()) return;
   const est = porId(id);
-  if (!est || esExamenCero(est)) return;
+  if (!est || reproboExamen(est)) return;
   const nuevo = !(est.bloqueado === true || est.bloqueado === 1 || est.bloqueado === '1');
   est.bloqueado = nuevo;
   if (String(estado.fijado) === String(id)) estado.fijado = null;
@@ -1568,6 +1671,7 @@ function alternarBloqueo(id) {
 }
 
 function asignar(estudianteId, sedeId) {
+  if (!periodoAbierto()) return false;
   const eid = String(estudianteId);
   const est = porId(eid);
   const sede = sedePorId(sedeId);
@@ -1575,8 +1679,8 @@ function asignar(estudianteId, sedeId) {
   if (estado.asignado[eid] === sedeId) return false;
 
   if (estaBloqueado(est)) {
-    aviso(esExamenCero(est) ? est.apellidos + ' no aprobó el examen: no puede postular'
-                            : est.apellidos + ' está bloqueado', 'bad');
+    aviso(reproboExamen(est) ? est.apellidos + ' no aprobó el examen: no puede postular'
+                             : est.apellidos + ' está bloqueado', 'bad');
     return false;
   }
 
@@ -1615,6 +1719,7 @@ function asignar(estudianteId, sedeId) {
 }
 
 function liberar(estudianteId) {
+  if (!periodoAbierto()) return;
   const eid = String(estudianteId);
   const sid = estado.asignado[eid];
   if (!sid) return;
@@ -1634,6 +1739,7 @@ function liberar(estudianteId) {
 }
 
 function vaciar() {
+  if (!periodoAbierto()) return;
   if (!Object.keys(estado.asignado).length) { aviso('El tablero ya está vacío'); return; }
   if (!confirm('¿Devolver los 64 postulantes a la nómina y liberar todas las plazas?')) return;
 
@@ -1665,6 +1771,7 @@ function vaciar() {
    ARRASTRE
    ============================================================ */
 function hacerArrastrable(nodo, id) {
+  if (estado.finalizado) return;   // período cerrado: nada se arrastra
   nodo.draggable = true;
   nodo.addEventListener('dragstart', ev => {
     estado.arrastrando = String(id);
@@ -1883,10 +1990,11 @@ function actualizarConteoFiltro() {
    ============================================================ */
 function fichaNomina(est) {
   const bloqueado = estaBloqueado(est);
-  const examenCero = esExamenCero(est);
+  const reprobo = reproboExamen(est);
+  const alterna = esMallaAlterna(est);   // malla anterior: no rinde examen, otro color
 
   const art = document.createElement('article');
-  art.className = 'rec' + (bloqueado ? ' bloqueado' : '');
+  art.className = 'rec' + (bloqueado ? ' bloqueado' : (alterna ? ' alterna' : ''));
   if (String(estado.fijado) === String(est.id)) art.classList.add('picked');
 
   // Rail coloreado por prioridad (Art. 11): el color agrupa la nómina de un vistazo.
@@ -1897,7 +2005,7 @@ function fichaNomina(est) {
   rail.className = 'rec-rail';
   rail.style.background = bloqueado ? 'var(--alert)' : infoP.color;
   rail.textContent = bloqueado ? '⛔' : (prio <= 5 ? ('P' + prio) : '—');
-  rail.title = bloqueado ? (examenCero ? 'No aprobó el examen' : 'Bloqueado') : infoP.et;
+  rail.title = bloqueado ? (reprobo ? 'No aprobó el examen' : 'Bloqueado') : infoP.et;
 
   const main = document.createElement('div');
   main.className = 'rec-main';
@@ -1919,7 +2027,7 @@ function fichaNomina(est) {
   main.querySelector('.gpa-num').textContent = est.gpa != null ? Number(est.gpa).toFixed(2) : '—';
   const prioTag = main.querySelector('.rec-prio');
   if (bloqueado) {
-    prioTag.textContent = examenCero ? '⛔ No aprobó el examen' : '⛔ Bloqueado';
+    prioTag.textContent = reprobo ? '⛔ No aprobó el examen' : '⛔ Bloqueado';
     prioTag.style.color = 'var(--alert)';
     prioTag.style.borderColor = 'var(--alert)';
   } else {
@@ -1944,24 +2052,33 @@ function fichaNomina(est) {
     { k: 'discapacidad', et: 'Discap.' },
     { k: 'embarazada', et: 'Embarazo' }
   ].filter(c => !esVacio(est[c.k]));
-  if (criterios.length) {
+  if (criterios.length || alterna) {
     const row = document.createElement('div');
     row.className = 'rec-criterios';
+    // Malla anterior: marca visible de por qué la tarjeta va en ámbar y su examen no cuenta.
+    if (alterna) {
+      const marca = document.createElement('span');
+      marca.className = 'crit crit-alt';
+      marca.textContent = 'Malla anterior · no rinde examen';
+      row.appendChild(marca);
+    }
     criterios.forEach(c => {
       const chip = document.createElement('span');
       chip.className = 'crit';
-      chip.textContent = c.et ? (c.et + ' ' + est[c.k]) : String(est[c.k]);
+      // En malla anterior el examen no aplica: se muestra "n/a" en vez de un 0 que parezca reprobado.
+      const valor = (c.k === 'examen' && alterna) ? 'n/a' : est[c.k];
+      chip.textContent = c.et ? (c.et + ' ' + valor) : String(valor);
       row.appendChild(chip);
     });
     main.appendChild(row);
   }
 
-  // Botón de bloqueo manual. El examen=0 es un bloqueo duro (requisito no
-  // cumplido): se muestra como candado fijo, sin poder desbloquear.
+  // Botón de bloqueo manual. Reprobar el examen requerido es un bloqueo duro
+  // (requisito no cumplido): se muestra como candado fijo, sin poder desbloquear.
   const btnBloq = document.createElement('button');
   btnBloq.type = 'button';
   btnBloq.className = 'rec-bloq' + (bloqueado ? ' on' : '');
-  if (examenCero) {
+  if (reprobo) {
     btnBloq.textContent = '⛔ No aprobó examen';
     btnBloq.disabled = true;
     btnBloq.title = 'No aprobó el examen de ciencias clínicas: no puede postular';
@@ -1976,8 +2093,8 @@ function fichaNomina(est) {
   if (bloqueado) {
     // Bloqueado: no se arrastra ni se fija; el clic solo avisa por qué.
     art.addEventListener('click', () => {
-      aviso(examenCero ? est.apellidos + ' no aprobó el examen: no puede postular'
-                       : est.apellidos + ' está bloqueado', 'bad');
+      aviso(reprobo ? est.apellidos + ' no aprobó el examen: no puede postular'
+                    : est.apellidos + ' está bloqueado', 'bad');
     });
   } else {
     art.addEventListener('click', () => fijar(est.id));
@@ -2596,6 +2713,40 @@ $('#btn-tema').addEventListener('click', alternarTema);
 $('#btn-reset').addEventListener('click', vaciar);
 $('#btn-todo').addEventListener('click', exportarTodo);
 
+// Refleja en la interfaz si el período está finalizado: banner, etiqueta del
+// botón, y Vaciar deshabilitado. Las descargas siguen habilitadas.
+function aplicarFinalizado() {
+  const fin = estado.finalizado;
+  $('#banner-final').hidden = !fin;
+  $('#btn-finalizar-txt').textContent = fin ? 'Reabrir período' : 'Finalizar sorteo';
+  $('#btn-finalizar').classList.toggle('reabrir', fin);
+  $('#btn-reset').disabled = fin;
+  document.body.classList.toggle('finalizado', fin);
+}
+
+$('#btn-finalizar').addEventListener('click', async () => {
+  const nuevo = !estado.finalizado;
+  const msg = nuevo
+    ? 'Finalizar el sorteo cerrará el tablero: nadie podrá asignar, mover ni vaciar; solo descargar. ¿Continuar?'
+    : 'Reabrir el período permitirá volver a mover y asignar. ¿Continuar?';
+  if (!confirm(msg)) return;
+  const btn = $('#btn-finalizar');
+  btn.disabled = true;
+  try {
+    await escribirFinalizado(nuevo);
+    estado.finalizado = nuevo;
+    estado.fijado = null;
+    pintar();               // re-render: sin arrastre ni botones activos
+    aplicarFinalizado();
+    aviso(nuevo ? 'Período finalizado — solo descargas' : 'Período reabierto', nuevo ? 'bad' : 'ok');
+  } catch (err) {
+    aviso('No se pudo ' + (nuevo ? 'finalizar' : 'reabrir') + ': ' + err.message, 'bad');
+  } finally {
+    btn.disabled = false;
+    if (estado.finalizado) $('#btn-reset').disabled = true;
+  }
+});
+
 const roster = $('#roster');
 roster.addEventListener('dragover', ev => {
   if (!estado.arrastrando || !estado.asignado[estado.arrastrando]) return;
@@ -2637,14 +2788,17 @@ function ocultarAcceso() {
 
 async function arrancar() {
   if (!MODO_REMOTO) {
+    estado.finalizado = await leerFinalizado();
     recuperar();
     pintar();
+    aplicarFinalizado();
     return;
   }
   try {
-    await cargarDesdeTabla();
+    await cargarDesdeTabla();   // también lee estado.finalizado
     ocultarAcceso();
     pintar();
+    aplicarFinalizado();
   } catch (err) {
     if (!/sesión no válida/.test(err.message)) {
       mostrarAcceso('No se pudo leer la tabla: ' + err.message);

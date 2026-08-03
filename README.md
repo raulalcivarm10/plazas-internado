@@ -20,9 +20,18 @@ rango numérico para GPA/créditos/examen, chips de categoría (con etiquetas le
 para el resto. Los campos aparecen a medida que se llenan en el Excel.
 
 **Bloqueo.** Quien tiene el examen de ciencias clínicas en 0 no aprobó el requisito:
-sale en rojo, al final de la nómina y no se puede asignar. Además cada ficha tiene un
-botón para **bloquear/desbloquear** manualmente (p. ej. documento faltante); el
-bloqueo se guarda en la base, así ambas coordinadoras lo ven.
+sale en rojo, al final de la nómina y no se puede asignar. Excepción: quien viene de
+una **malla anterior** (pensum distinto de 1360 y 1271) no rinde ese examen, así que
+su 0 no lo bloquea — sale en **ámbar** ("no rinde examen"), movible y en su orden
+normal. Además cada ficha tiene un botón para **bloquear/desbloquear** manualmente
+(p. ej. documento faltante); el bloqueo se guarda en la base, así ambas coordinadoras
+lo ven.
+
+**Finalizar período.** El botón *Finalizar sorteo* cierra el tablero: nadie puede
+asignar, mover, bloquear ni vaciar — solo descargar los reportes. El estado se guarda
+en la base (`int_config`) y lo hacen cumplir también los endpoints (una escritura con
+el período cerrado responde 423). *Reabrir período* lo revierte. Ambas acciones piden
+confirmación.
 
 | Sede | Plazas |
 |---|---|

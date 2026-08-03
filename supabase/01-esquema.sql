@@ -168,3 +168,20 @@ grant  update (sede_id, bloqueado) on public.estudiantes to authenticated;
 
 create policy "sedes_lectura" on public.sedes
   for select to authenticated using (public.es_autorizado());
+
+-- Config del período (finalizado='1' cierra el sorteo: solo descargas).
+create table if not exists public.config (
+  clave text primary key,
+  valor text
+);
+insert into public.config (clave, valor) values ('finalizado', '0')
+  on conflict (clave) do nothing;
+
+alter table public.config enable row level security;
+drop policy if exists "config_lectura"    on public.config;
+drop policy if exists "config_actualizar" on public.config;
+create policy "config_lectura" on public.config
+  for select to authenticated using (public.es_autorizado());
+create policy "config_actualizar" on public.config
+  for update to authenticated
+  using (public.es_autorizado()) with check (public.es_autorizado());
