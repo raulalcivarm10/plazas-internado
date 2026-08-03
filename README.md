@@ -43,7 +43,7 @@ confirmación.
 ## Estructura
 
 ```
-data/estudiantes.json   los 64 postulantes (NO se versiona: datos personales)
+data/estudiantes.json   los postulantes (NO se versiona: datos personales)
 src/plantilla.html      la app: estilos, marcado y lógica, con marcador de datos
 scripts/build.js        inyecta los datos y genera cada variante
 docs/index.html         build PÚBLICO  -> lo que sirve GitHub Pages
@@ -116,7 +116,7 @@ revocar. No hace falta tocar código ni políticas.
 
 | Dónde | Qué contiene |
 |---|---|
-| Tabla `estudiantes` | Los 64 registros completos, con su `sede_id` |
+| Tabla `estudiantes` | Los registros completos, con su `sede_id` |
 | Tabla `sedes` | Los cupos (30 / 19 / 15) — cambiarlos es un UPDATE |
 | HTML publicado | Ningún dato personal: llegan tras iniciar sesión |
 | Contraseña | En ningún archivo; solo en el gestor de quien entra |

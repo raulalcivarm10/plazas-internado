@@ -1114,7 +1114,7 @@ body.finalizado .rec { cursor: default; }
       <div class="roster-done" id="nomina-lista">
         <span class="mark">&#10003;</span>
         <strong>Nómina completa</strong>
-        <span>Los 64 postulantes tienen sede asignada.</span>
+        <span>Todos los postulantes tienen sede asignada.</span>
       </div>
     </div>
   </section>
@@ -1741,7 +1741,7 @@ function liberar(estudianteId) {
 function vaciar() {
   if (!periodoAbierto()) return;
   if (!Object.keys(estado.asignado).length) { aviso('El tablero ya está vacío'); return; }
-  if (!confirm('¿Devolver los 64 postulantes a la nómina y liberar todas las plazas?')) return;
+  if (!confirm('¿Devolver todos los postulantes a la nómina y liberar todas las plazas?')) return;
 
   const asignadosPrevios = Object.keys(estado.asignado);
   estado.asignado = {};
@@ -2686,7 +2686,7 @@ function exportarTodo() {
 
   hojas.push({
     nombre: 'CONSOLIDADO',
-    titulo: 'CONSOLIDADO GENERAL — 64 POSTULANTES',
+    titulo: 'CONSOLIDADO GENERAL — ' + consolidado.length + ' POSTULANTES',
     filas: consolidado,
     acento: '16211E',
     conSede: true
